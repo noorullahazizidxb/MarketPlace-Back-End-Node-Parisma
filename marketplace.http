@@ -1,31 +1,266 @@
-### Create listing
-POST http://localhost:4000/api/listings
+### Marketplace API - Rest Client tests
+
+@host = http://localhost:4000/api
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
+@adminToken = 
+@listingId = 1
+
+### Health
+GET {{host}}/health
+
+###
+# Auth - generic register (defaults to USER)
+### (Note) Generic /auth/register removed - use role-specific endpoints below
+
+###
+# Auth - login
+POST {{host}}/auth/login
 Content-Type: application/json
-Authorization: Bearer <TOKEN>
 
 {
-  "title": "Test apartment for rent in Kabul",
-  "description": "Nice two-bedroom apartment near city center",
-  "price": 1200,
-  "currency": "AFN",
-  "listingType": "RENT",
-  "categoryId": 1,
-  "location": "Kabul",
-  "address": "Street 10, Kabul",
-  "contactVisibility": "HIDE_SELLER",
-  "images": ["https://example.com/img1.jpg"]
+  "email": "admin@example.com",
+  "password": "password123"
 }
 
-### Get listing
-GET http://localhost:4000/api/listings/{{listingId}}
+###
+# Role-specific registration endpoints
 
-### Approve listing (admin)
-POST http://localhost:4000/api/listings/{{listingId}}/approve
+# Register as USER (alias)
+POST {{host}}/auth/user/register
 Content-Type: application/json
-Authorization: Bearer <ADMIN_TOKEN>
+
+{
+  "email": "adms@example.com",
+  "password": "password123",
+  "phone": "+93000000001",
+  "firstName": "Noor",
+  "lastName": "Azizi",
+  "fullName": "Noor Azizi",
+  "contacts": { "phone": "+93000000001", "whatsapp": "+93000000001", "telegram": "@noor" },
+  "address": { "street": "Street 10", "city": "Kabul", "country": "AF", "postalCode": "1001" },
+  "photo": "/uploads/profiles/noor.jpg",
+  "metadata": { "preferredLanguage": "en" }
+}
+
+###
+# Register as REPRESENTATIVE (public)
+POST {{host}}/auth/representative/register
+Content-Type: application/json
+
+{
+  "email": "rep1@example.com",
+  "password": "password123",
+  "phone": "+93000000002",
+  "firstName": "Rep",
+  "lastName": "One",
+  "fullName": "Rep One",
+  "contacts": { "phone": "+93000000002", "whatsapp": "+93000000002" , "primary": "+93000000002"},
+  "address": { "street": "Rep St 1", "city": "Kabul", "country": "AF" },
+  "representativeInfo": { "region": "Kabul", "whatsappNumber": "+93000000002", "active": true }
+}
+
+###
+# Register as ADMIN (protected - requires ADMIN token)
+POST {{host}}/auth/admin/register
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "admin2@example.com",
+  "password": "password123",
+  "phone": "+93000000003",
+  "firstName": "Admin",
+  "lastName": "Two",
+  "fullName": "Admin Two",
+  "contacts": { "phone": "+93000000003", "whatsapp": "+93000000003" },
+  "address": { "street": "Admin St", "city": "Kabul", "country": "AF" },
+  "photo": "/uploads/profiles/admin2.jpg",
+  "metadata": { "notes": "seed admin" }
+}
+
+###
+# Admin - stats (shows retention days, scheduled times and queue job counts)
+GET {{host}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+###
+# Listings - create (requires Authorization header)
+POST {{host}}/listings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "2BR Apartment for Rent",
+  "description": "Nice 2 bedroom apartment near the market.",
+  "listingType": "RENT",
+  "price": 200,
+  "currency": "USD",
+  "location": "Kabul",
+  "address": "Street 1, Near Market",
+  "categoryId": 1,
+  "contactVisibility": "SHOW_SELLER",
+  "metadata": { "floor": 3, "furnished": true, "parking": "shared" },
+  "expiresAt": "2025-10-10T00:00:00.000Z",
+  "images": [
+    { "url": "/uploads/listings/1/img1.jpg", "alt": "kitchen view", "position": 0 },
+    { "url": "/uploads/listings/1/img2.jpg", "alt": "living room", "position": 1 }
+  ]
+}
+
+###
+# Listings - get
+GET {{host}}/listings/{{listingId}}
+
+###
+# Listings - approve (admin)
+POST {{host}}/listings/{{listingId}}/approve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
 
 {
   "contactVisibility": "SHOW_SELLER",
-  "hideSellerContact": false,
-  "notifyUser": true
+  "notes": "Approved by admin",
+  "approvedAt": "2025-09-10T12:00:00.000Z",
+  "approvedById": "user0@example.com",
+  "meta": { "moderator": "admin@example.com", "reason": "meets guidelines" }
 }
+
+###
+# Listing images - upload (multipart/form-data)
+# Replace :id with listing id
+POST {{host}}/listings/{{listingId}}/images
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data
+
+--file
+Content-Disposition: form-data; name="image"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/sample.jpg
+
+###
+# User photo upload (multipart)
+POST {{host}}/users/me/photo
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data
+
+--file
+Content-Disposition: form-data; name="photo"; filename="me.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/me.jpg
+
+###
+# Update my profile (name/contacts/address)
+PUT {{host}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "firstName": "Noor",
+  "lastName": "Azizi",
+  "fullName": "Noor Azizi",
+  "phone": "+93000000001",
+  "photo": "/uploads/profiles/noor.jpg",
+  "contacts": { "phone": "+93000000001", "whatsapp": "+93000000001" , "preferred": "whatsapp" },
+  "address": { "street": "Street 10", "city": "Kabul", "country": "AF", "unit": "Apt 5" },
+  "metadata": { "language": "en", "timezone": "Asia/Kabul" }
+}
+
+###
+# Renew - issue token (requires auth)
+POST {{host}}/renew/issue
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "listingId": {{listingId}},
+  "requestedBy": "{{token}}",
+  "notes": "Requesting 30 day renew",
+  "expiresInDays": 30
+}
+
+###
+# Renew - redeem token
+POST {{host}}/renew/redeem
+Content-Type: application/json
+
+{
+  "token": "PASTE_TOKEN_HERE",
+  "redeemedBy": "{{token}}",
+  "clientIp": "127.0.0.1"
+}
+
+###
+# Notifications - send (requires auth)
+POST {{host}}/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Test Notification",
+  "message": "This is a test",
+  "channel": "WHATSAPP",
+  "targetType": "USER",
+  "recipientUserIds": ["1"],
+  "listingId": "{{listingId}}",
+  "meta": { "urgent": true },
+  "triggerEvent": "MANUAL_TEST"
+}
+
+###
+# Forward listing to reps (requires auth)
+POST {{host}}/forward
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "listingId": "{{listingId}}",
+  "region": "Kabul",
+  "buyerMessage": "Interested buyer",
+  "buyerContact": "+93000000000",
+  "buyerName": "Ali",
+  "buyerEmail": "ali@example.com",
+  "preferredChannel": "WHATSAPP",
+  "notes": "Please ask for viewing times"
+}
+
+###
+# Roles - assign (admin)
+POST {{host}}/roles/assign
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "userId": "2",
+  "role": "REPRESENTATIVE",
+  "assignedBy": "{{adminToken}}",
+  "metadata": { "region": "Kabul" }
+}
+
+###
+# Roles - list user roles (admin)
+GET {{host}}/roles/user/2
+Authorization: Bearer {{adminToken}}
+
+### Jobs / retention & scheduled times (from .env)
+# These env vars control background cleanup, renew windows and feedback reminders (days)
+# UNAPPROVED_RETENTION_DAYS = 2
+# SOLD_RENTED_CLEANUP_DAYS = 14
+# DRAFT_CLEANUP_DAYS = 14
+# LISTING_DEFAULT_EXPIRY_DAYS = 30
+# RENEW_WINDOW_DAYS = 14
+# FEEDBACK_REMINDER_DAYS = 7
+
+# Scheduled times for recurring jobs (HH:mm 24-hour) - configure in .env
+# MODERATION_CLEANUP_TIME=03:00
+# STATUS_CLEANUP_TIME=04:00
+# FEEDBACK_REMINDER_TIME=05:00
+# RENEWAL_CLEANUP_TIME=06:00
+
+# Notes about seeded accounts
+# - The seeder creates 60 users. The first seeded user is assigned the ADMIN role.
+# - Admin credentials (seed): email = user0@example.com, password = password123
+# - Representative samples: user1@example.com .. user5@example.com (password: password123)
+# To obtain an admin token using the Rest Client above: first run the login request
+# with the admin credentials and paste the returned token into the {{adminToken}} variable.

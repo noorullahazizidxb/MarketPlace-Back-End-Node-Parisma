@@ -6,13 +6,22 @@ let esClient;
 
 export function getES() {
   if (!esClient) {
-    esClient = new Client({
+    const base = {
       node: config.elastic.node,
       auth: config.elastic.username ? {
         username: config.elastic.username,
         password: config.elastic.password
       } : undefined
-    });
+    };
+
+    // Allow self-signed certs when explicitly enabled in env.
+    if (config.elastic.allowSelfSigned) {
+      base.tls = { rejectUnauthorized: false };
+      // also allow insecure connections for older clients
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
+
+    esClient = new Client(base);
   }
   return esClient;
 }

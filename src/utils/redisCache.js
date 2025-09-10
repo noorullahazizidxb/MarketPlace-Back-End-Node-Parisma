@@ -22,6 +22,14 @@ export async function redisSet(key, value, ttlSec = 30) {
   }
 }
 
+export async function redisDel(key) {
+  try {
+    await redis.del(key);
+  } catch (e) {
+    cache.del(key);
+  }
+}
+
 export async function cachedResponse(key, fetchFn, ttl = 30) {
   // Try Redis
   const r = await redisGet(key);

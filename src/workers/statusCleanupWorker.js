@@ -1,11 +1,12 @@
-import pkg from 'bullmq';
-const { Worker, QueueEvents } = pkg;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { Worker, QueueEvents } = require('bullmq');
 import IORedis from 'ioredis';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
 import { logger } from '../utils/logger.js';
 
-const connection = new IORedis(config.redisUrl);
+const connection = new IORedis(config.redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
 
 export const statusCleanupWorker = new Worker('status-cleanup', async (job) => {
   // delete SOLD/RENTED older than SOLD_RENTED_CLEANUP_DAYS

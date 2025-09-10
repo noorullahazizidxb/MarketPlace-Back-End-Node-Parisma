@@ -10,10 +10,10 @@ export const listingRepository = {
     return prisma.listing.findUnique({
       where: { id },
       include: {
-        images: true,
-        representatives: { include: { representative: true } },
-        user: true,
-        category: true
+  images: true,
+  representatives: { include: { representative: true } },
+  user: { include: { roles: true } },
+  category: true
       }
     });
   },
@@ -45,7 +45,7 @@ export const listingRepository = {
     const take = opts.limit || 20;
     const skip = opts.offset || 0;
 
-    return prisma.listing.findMany({ where, take, skip, orderBy: { createdAt: 'desc' } });
+  return prisma.listing.findMany({ where, take, skip, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
   },
 
   async findUnapprovedOlderThan(cutoffDate) {

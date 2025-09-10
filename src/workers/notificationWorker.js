@@ -1,5 +1,6 @@
-import pkg from 'bullmq';
-const { Worker, QueueEvents } = pkg;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { Worker, QueueEvents } = require('bullmq');
 import IORedis from 'ioredis';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
@@ -7,7 +8,7 @@ import { logger } from '../utils/logger.js';
 import { sendWhatsApp } from '../notifications/whatsappAdapter.js';
 import { sendEmail } from '../notifications/emailAdapter.js';
 
-const connection = new IORedis(config.redisUrl);
+const connection = new IORedis(config.redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
 
 export const notificationWorker = new Worker('notification-dispatch', async (job) => {
   const { notificationId } = job.data;

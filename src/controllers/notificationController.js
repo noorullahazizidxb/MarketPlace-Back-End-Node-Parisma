@@ -9,6 +9,9 @@ export const notificationController = {
   if (error) return res.apiError(error.message, 400);
   const senderId = req.user?.id;
   const n = await createNotification({ ...value, senderId });
-  res.apiSuccess(n, 'Created', 201);
+  // fetch created notification with relations
+  const { prisma } = await import('../config/prisma.js');
+  const full = await prisma.notification.findUnique({ where: { id: n.id }, include: { recipients: { include: { user: { include: { roles: true } } } }, listing: { include: { images: true, user: { include: { roles: true } }, category: true } }, sender: { include: { roles: true } } } });
+  res.apiSuccess(full, 'Created', 201);
   }
 };

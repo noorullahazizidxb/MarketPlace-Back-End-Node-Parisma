@@ -1,5 +1,4 @@
 import express from 'express';
-import { requireAuth } from '../middleware/auth.js';
 import listingsRouter from './listings.js';
 import categoriesRouter from './categories.js';
 import representativesRouter from './representatives.js';

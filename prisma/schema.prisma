@@ -29,19 +29,19 @@ enum ListingType {
 }
 
 enum ListingStatus {
-  PENDING      // awaiting admin approval
-  APPROVED     // visible & active
-  REJECTED     // rejected by admin
-  SOLD         // sold (for sales) triggers cleanup after retention window
-  RENTED       // rented (for rentals) triggers feedback & potential cleanup
-  EXPIRED      // time based expiration (not renewed)
-  DRAFT        // user saved but not submitted; periodically cleaned
-  HIDDEN       // temporarily hidden by admin
+  PENDING // awaiting admin approval
+  APPROVED // visible & active
+  REJECTED // rejected by admin
+  SOLD // sold (for sales) triggers cleanup after retention window
+  RENTED // rented (for rentals) triggers feedback & potential cleanup
+  EXPIRED // time based expiration (not renewed)
+  DRAFT // user saved but not submitted; periodically cleaned
+  HIDDEN // temporarily hidden by admin
 }
 
 enum ContactVisibility {
-  HIDE_SELLER   // show platform contact info
-  SHOW_SELLER   // show seller contact info
+  HIDE_SELLER // show platform contact info
+  SHOW_SELLER // show seller contact info
 }
 
 enum NotificationTargetType {
@@ -62,23 +62,29 @@ enum NotificationChannel {
 // Models
 // --------------------------------------------------
 model User {
-  id              String            @id @default(cuid())
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  email           String?           @unique
-  phone           String?
-  photo           String?
-  passwordHash    String
-  roles           UserRole[]
-  listings        Listing[]
-  representative  RepresentativeInfo?
-  notifications   NotificationRecipient[]
-  sentNotifications Notification[] @relation("SenderNotifications")
+  id                String                  @id @default(cuid())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  email             String?                 @unique
+  phone             String?
+  photo             String?
+  firstName         String?
+  lastName          String?
+  fullName          String?
+  contacts          Json?
+  address           Json?
+  passwordHash      String
+  roles             UserRole[]
+  listings          Listing[]
+  representative    RepresentativeInfo?
+  notifications     NotificationRecipient[]
+  sentNotifications Notification[]          @relation("SenderNotifications")
   // Listings this user approved
-  approvedListings Listing[] @relation("ListingApprovedBy")
+  approvedListings  Listing[]               @relation("ListingApprovedBy")
   // Audit logs where this user acted
-  auditLogs       AuditLog[]
-  feedbacks       ListingFeedback[]
+  auditLogs         AuditLog[]
+  feedbacks         ListingFeedback[]
+
   @@index([phone])
 }
 
@@ -87,56 +93,59 @@ model UserRole {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
   role   Role
+
   @@unique([userId, role])
 }
 
 model RepresentativeInfo {
-  id              Int       @id @default(autoincrement())
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          String    @unique
-  region          String
-  whatsappNumber  String?
-  active          Boolean   @default(true)
-  listings        ListingRepresentative[]
+  id             Int                     @id @default(autoincrement())
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String                  @unique
+  region         String
+  whatsappNumber String?
+  active         Boolean                 @default(true)
+  listings       ListingRepresentative[]
+
   @@index([region])
   @@index([whatsappNumber])
 }
 
 model Category {
-  id          Int        @id @default(autoincrement())
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  name        String
-  slug        String     @unique
-  parentId    Int?
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryHierarchy")
-  listings    Listing[]
-  isActive    Boolean    @default(true)
+  id        Int        @id @default(autoincrement())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  name      String
+  slug      String     @unique
+  parentId  Int?
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  listings  Listing[]
+  isActive  Boolean    @default(true)
+
   @@index([parentId])
 }
 
 model Listing {
-  id                String                 @id @default(cuid())
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  id                String                  @id @default(cuid())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
   title             String
   description       String
-  price             Decimal                @db.Decimal(12,2)
-  currency          String                 @default("AFN")
+  price             Decimal                 @db.Decimal(12, 2)
+  currency          String                  @default("AFN")
   listingType       ListingType
-  status            ListingStatus          @default(PENDING)
-  contactVisibility ContactVisibility      @default(HIDE_SELLER)
-  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            ListingStatus           @default(PENDING)
+  contactVisibility ContactVisibility       @default(HIDE_SELLER)
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId            String
-  category          Category               @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category          Category                @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   categoryId        Int
   location          String?
   address           String?
   metadata          Json?
   approvedAt        DateTime?
   approvedById      String?
-  approvedBy        User?                  @relation("ListingApprovedBy", fields: [approvedById], references: [id])
+  approvedBy        User?                   @relation("ListingApprovedBy", fields: [approvedById], references: [id])
   expiresAt         DateTime?
   soldOrRentedAt    DateTime?
   images            ListingImage[]
@@ -144,7 +153,8 @@ model Listing {
   feedbacks         ListingFeedback[]
   searchIndex       SearchIndex?
   renewTokens       ListingRenewToken[]
-  notifications     Notification[] @relation("ListingNotifications")
+  notifications     Notification[]          @relation("ListingNotifications")
+
   @@index([createdAt])
   @@index([listingType])
   @@index([status])
@@ -155,91 +165,97 @@ model Listing {
 }
 
 model ListingImage {
-  id         Int      @id @default(autoincrement())
-  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId  String
-  url        String
-  position   Int      @default(0)
-  alt        String?
+  id        Int     @id @default(autoincrement())
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  url       String
+  position  Int     @default(0)
+  alt       String?
+
   @@index([listingId])
 }
 
 model ListingRepresentative {
-  id                 Int               @id @default(autoincrement())
-  listing            Listing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId          String
-  representative     RepresentativeInfo @relation(fields: [representativeId], references: [id], onDelete: Cascade)
-  representativeId   Int
-  assignedAt         DateTime          @default(now())
+  id               Int                @id @default(autoincrement())
+  listing          Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId        String
+  representative   RepresentativeInfo @relation(fields: [representativeId], references: [id], onDelete: Cascade)
+  representativeId Int
+  assignedAt       DateTime           @default(now())
+
   @@unique([listingId, representativeId])
   @@index([listingId])
   @@index([representativeId])
 }
 
 model ListingFeedback {
-  id         Int       @id @default(autoincrement())
-  listing    Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId  String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
+  id          Int           @id @default(autoincrement())
+  listing     Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId   String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
   statusAfter ListingStatus
-  comment    String?
-  createdAt  DateTime  @default(now())
+  comment     String?
+  createdAt   DateTime      @default(now())
+
   @@index([listingId])
   @@index([userId])
 }
 
 model ListingRenewToken {
-  id         Int       @id @default(autoincrement())
-  listing    Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId  String    @unique
-  token      String    @unique
-  issuedAt   DateTime  @default(now())
-  expiresAt  DateTime
-  used       Boolean   @default(false)
+  id        Int      @id @default(autoincrement())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String   @unique
+  token     String   @unique
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
   @@index([expiresAt])
 }
 
 // Denormalized search index model to sync into Elasticsearch asynchronously (acts as staging/versioning)
 model SearchIndex {
-  id          Int       @id @default(autoincrement())
-  listing     Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId   String    @unique
-  payload     Json      // flattened searchable fields used to push to ES
-  version     Int       @default(1)
-  updatedAt   DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String   @unique
+  payload   Json // flattened searchable fields used to push to ES
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
 }
 
 model Notification {
-  id           String                     @id @default(cuid())
-  createdAt    DateTime                   @default(now())
-  updatedAt    DateTime                   @updatedAt
+  id           String                  @id @default(cuid())
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
   title        String
   message      String
-  channel      NotificationChannel        @default(SYSTEM)
+  channel      NotificationChannel     @default(SYSTEM)
   targetType   NotificationTargetType
-  sender       User?                      @relation("SenderNotifications", fields: [senderId], references: [id])
+  sender       User?                   @relation("SenderNotifications", fields: [senderId], references: [id])
   senderId     String?
-  listing      Listing?                   @relation("ListingNotifications", fields: [listingId], references: [id])
+  listing      Listing?                @relation("ListingNotifications", fields: [listingId], references: [id])
   listingId    String?
   recipients   NotificationRecipient[]
   sentAt       DateTime?
   meta         Json?
   triggerEvent String?
+
   @@index([targetType])
   @@index([triggerEvent])
 }
 
 model NotificationRecipient {
-  id             Int           @id @default(autoincrement())
-  notification   Notification  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  id             Int          @id @default(autoincrement())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   notificationId String
-  user           User?         @relation(fields: [userId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
   userId         String?
   role           Role?
   readAt         DateTime?
   deliveredAt    DateTime?
   deliveryError  String?
+
   @@index([role])
   @@index([notificationId])
   @@index([userId])
@@ -247,14 +263,15 @@ model NotificationRecipient {
 
 // Audit trail for moderation actions, cleanups, status changes
 model AuditLog {
-  id          Int       @id @default(autoincrement())
-  createdAt   DateTime  @default(now())
-  actorId     String?
-  actor       User?     @relation(fields: [actorId], references: [id])
-  listingId   String?
-  action      String
-  details     Json?
-  ip          String?
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  listingId String?
+  action    String
+  details   Json?
+  ip        String?
+
   @@index([actorId])
   @@index([listingId])
   @@index([action])
@@ -271,6 +288,7 @@ model JobRecord {
   status      String    @default("ENQUEUED")
   lastError   String?
   processedAt DateTime?
+
   @@index([queue])
   @@index([name])
   @@index([status])

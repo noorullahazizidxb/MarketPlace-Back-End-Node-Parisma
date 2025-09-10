@@ -3,6 +3,7 @@ import { queues } from '../jobs/queues.js';
 import { prisma } from '../config/prisma.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { cachedResponse, redisSet, redisDel } from '../utils/redisCache.js';
 
 export const listingService = {
   async createListing(payload, userId) {
@@ -35,20 +36,25 @@ export const listingService = {
     // enqueue a search-index job (will index only after approved; worker will check status)
     await queues.SEARCH_INDEX.add('index-listing', { listingId: listing.id });
 
-    logger.info({ listingId: listing.id }, 'Created listing (pending approval)');
-    return listing;
+  // reload with relations for response
+  const full = await listingRepository.getById(listing.id);
+  // cache listing detail
+  try { await redisSet(`listing:${full.id}`, full, 60); } catch (e) {}
+  logger.info({ listingId: listing.id }, 'Created listing (pending approval)');
+  return full;
   },
 
   async getListing(id) {
-    const listing = await listingRepository.getById(id);
-    if (!listing) return null;
+  const key = `listing:${id}`;
+  const listing = await cachedResponse(key, async () => await listingRepository.getById(id), 60);
+  if (!listing) return null;
     // enforce contact visibility: return platform contact placeholders if hidden
     if (listing.contactVisibility === 'HIDE_SELLER') {
       // remove sensitive user contact fields
       const safeUser = { id: listing.user.id, name: listing.user.email ? listing.user.email : null };
       listing.user = safeUser;
     }
-    return listing;
+  return listing;
   },
 
   async approveListing(listingId, adminId, opts = {}) {
@@ -60,7 +66,7 @@ export const listingService = {
       contactVisibility: opts.contactVisibility || 'HIDE_SELLER'
     };
 
-    const listing = await listingRepository.update(listingId, data);
+  const listing = await listingRepository.update(listingId, data);
 
     // push an index job to ensure ES is updated
     await queues.SEARCH_INDEX.add('index-listing', { listingId: listing.id, force: true });
@@ -78,7 +84,11 @@ export const listingService = {
       }
     });
 
-    logger.info({ listingId, adminId }, 'Listing approved');
-    return listing;
+  // reload with relations
+  const full = await listingRepository.getById(listing.id);
+  // invalidate cache
+  try { await redisDel(`listing:${full.id}`); } catch (e) {}
+  logger.info({ listingId, adminId }, 'Listing approved');
+  return full;
   }
 };

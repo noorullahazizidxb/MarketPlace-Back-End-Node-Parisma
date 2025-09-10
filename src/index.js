@@ -58,8 +58,20 @@ app.use((err, req, res, next) => {
 });
 
 async function start() {
-  await initSearch();
+  try {
+    await initSearch();
+  } catch (e) {
+    logger.warn(e, 'Elasticsearch init failed - continuing without search (make sure ES is running)');
+  }
   await initQueues();
+  // Log retention/cleanup and reminder days on startup
+  try {
+    const r = config.retention || {};
+  const s = config.schedules || {};
+  logger.info({ retention: r, schedules: s }, 'Retention and scheduled job times (days / HH:mm)');
+  } catch (e) {
+    logger.warn(e, 'Failed to log retention configuration');
+  }
   // schedule recurring jobs (creates repeatable jobs)
   try {
     await scheduleRecurringJobs();

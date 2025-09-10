@@ -1,11 +1,12 @@
-import pkg from 'bullmq';
-const { Worker, QueueEvents } = pkg;
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { Worker, QueueEvents } = require('bullmq');
 import IORedis from 'ioredis';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
 import { logger } from '../utils/logger.js';
 
-const connection = new IORedis(config.redisUrl);
+const connection = new IORedis(config.redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
 
 export const renewalCleanupWorker = new Worker('renewal-cleanup', async (job) => {
   // Find expired listings (expiresAt < now) and not renewed -> set status EXPIRED and schedule deletion per retention

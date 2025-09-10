@@ -6,6 +6,11 @@ CREATE TABLE `User` (
     `email` VARCHAR(191) NULL,
     `phone` VARCHAR(191) NULL,
     `photo` VARCHAR(191) NULL,
+    `firstName` VARCHAR(191) NULL,
+    `lastName` VARCHAR(191) NULL,
+    `fullName` VARCHAR(191) NULL,
+    `contacts` JSON NULL,
+    `address` JSON NULL,
     `passwordHash` VARCHAR(191) NOT NULL,
 
     UNIQUE INDEX `User_email_key`(`email`),

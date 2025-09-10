@@ -15,8 +15,11 @@ export const renewController = {
     const { error, value } = redeemSchema.validate(req.body);
     if (error) return res.apiError(error.message, 400);
     try {
-      const listing = await renewService.redeemToken(value.token);
-      res.apiSuccess(listing, 'Redeemed', 200);
+  const listing = await renewService.redeemToken(value.token);
+  // reload listing with relations for response
+  const { prisma } = await import('../config/prisma.js');
+  const full = await prisma.listing.findUnique({ where: { id: listing.id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+  res.apiSuccess(full, 'Redeemed', 200);
     } catch (e) {
       res.apiError(e.message, 400);
     }

@@ -8,7 +8,8 @@ export const categoryController = {
     const { error, value } = createSchema.validate(req.body);
   if (error) return res.apiError(error.message, 400);
   const cat = await categoryService.create(value);
-  res.apiSuccess(cat, 'Created', 201);
+  const full = await prisma.category.findUnique({ where: { id: cat.id }, include: { children: true, listings: { include: { images: true, user: { include: { roles: true } } } } } });
+  res.apiSuccess(full, 'Created', 201);
   },
 
   async list(req, res) {
