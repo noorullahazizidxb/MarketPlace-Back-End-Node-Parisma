@@ -49,3 +49,16 @@ export const userController = {
     }
   }
 };
+
+// add list method
+userController.list = async function (req, res) {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const perPage = parseInt(req.query.perPage || '50', 10);
+    const users = await prisma.user.findMany({ skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    return res.apiSuccess(users, 'OK', 200);
+  } catch (e) {
+    logger.error(e, 'Failed to list users');
+    return res.apiError('Failed to list users', 500);
+  }
+};

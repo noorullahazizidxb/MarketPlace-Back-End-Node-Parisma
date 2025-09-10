@@ -133,7 +133,8 @@ async function main() {
   for (let i = 0; i < 60; i++) {
     const l = rndChoice(listings);
     const u = rndChoice(users);
-    await prisma.listingFeedback.create({ data: { listingId: l.id, userId: u.id, statusAfter: 'APPROVED', comment: randText(8) } });
+  const rating = randInt(1, 5);
+  await prisma.listingFeedback.create({ data: { listingId: l.id, userId: u.id, statusAfter: 'APPROVED', rating, comment: randText(8) } });
   }
 
   // ListingRenewToken (one per listing)

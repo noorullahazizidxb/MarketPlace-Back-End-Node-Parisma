@@ -6,4 +6,5 @@ import { Roles } from '../constants/enums.js';
 const router = express.Router();
 router.post('/assign', requireAuth, requireRole(Roles.ADMIN), roleController.assign);
 router.get('/user/:userId', requireAuth, requireRole(Roles.ADMIN), roleController.listUserRoles);
+router.get('/', requireAuth, requireRole(Roles.ADMIN), roleController.listAll);
 export default router;

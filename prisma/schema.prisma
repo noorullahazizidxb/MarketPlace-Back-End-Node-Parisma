@@ -195,6 +195,8 @@ model ListingFeedback {
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
   statusAfter ListingStatus
+  // numeric rating provided by the user (e.g., 1-5)
+  rating      Int?
   comment     String?
   createdAt   DateTime      @default(now())
 

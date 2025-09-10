@@ -15,3 +15,13 @@ export const roleController = {
   res.apiSuccess(roles, 'OK', 200);
   }
 };
+
+// list all role assignments (admin)
+roleController.listAll = async function (req, res) {
+  try {
+    const roles = await prisma.userRole.findMany({ include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+    return res.apiSuccess(roles, 'OK', 200);
+  } catch (e) {
+    return res.apiError('Failed to list roles', 500);
+  }
+};

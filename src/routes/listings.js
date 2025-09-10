@@ -7,6 +7,10 @@ import { Roles } from '../constants/enums.js';
 const router = express.Router();
 
 const upload = multer({ dest: 'tmp/uploads' });
+// List approved listings (public)
+router.get('/', listingController.listApproved);
+// List pending/unapproved listings (admin)
+router.get('/pending', requireAuth, requireRole(Roles.ADMIN), listingController.listPending);
 // Create a listing (user) - accept multipart/form-data (files + fields)
 router.post('/', requireAuth, upload.any(), listingController.create);
 

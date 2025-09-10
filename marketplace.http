@@ -3,7 +3,7 @@
 @host = http://localhost:4000/api
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
 @adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnV5aG8wMDAwdHU4OGgxMmg2OGx3Iiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU3NDk5NDk1LCJleHAiOjE3NTgxMDQyOTV9.9VqT6xQwqLs_L6Q4NbRWEVSlE6qElcIBm0juYkqzWOE
-@listingId = 1
+@listingId = cmfdwnrdo0000tur0iubjermu
 
 ### Health
 GET {{host}}/health
@@ -211,6 +211,15 @@ Content-Type: application/json
 GET {{host}}/listings/{{listingId}}
 
 ###
+# Listings - list approved (public)
+GET {{host}}/listings
+
+###
+# Listings - list pending (admin)
+GET {{host}}/listings/pending
+Authorization: Bearer {{adminToken}}
+
+###
 # Listings - approve (admin)
 POST {{host}}/listings/{{listingId}}/approve
 Authorization: Bearer {{adminToken}}
@@ -339,6 +348,39 @@ Content-Type: application/json
 # Roles - list user roles (admin)
 GET {{host}}/roles/user/2
 Authorization: Bearer {{adminToken}}
+
+###
+# Roles - list all role assignments (admin)
+GET {{host}}/roles
+Authorization: Bearer {{adminToken}}
+
+###
+# Users - list all users
+GET {{host}}/users
+Authorization: Bearer {{adminToken}}
+
+###
+# Notifications - list
+GET {{host}}/notifications
+Authorization: Bearer {{adminToken}}
+
+###
+# Forwarding - list forwarded history
+GET {{host}}/forward
+Authorization: Bearer {{adminToken}}
+
+###
+# Renew - list tokens
+GET {{host}}/renew/tokens
+Authorization: Bearer {{adminToken}}
+
+###
+# Categories - list
+GET {{host}}/categories
+
+###
+# Representatives - list by region (optional query param)
+GET {{host}}/representatives?region=Kabul
 
 ### Jobs / retention & scheduled times (from .env)
 # These env vars control background cleanup, renew windows and feedback reminders (days)

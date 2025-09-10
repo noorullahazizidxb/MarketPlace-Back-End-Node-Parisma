@@ -22,3 +22,15 @@ export const renewController = {
     }
   }
 };
+
+renewController.listTokens = async function (req, res) {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const perPage = parseInt(req.query.perPage || '50', 10);
+    const { prisma } = await import('../config/prisma.js');
+    const items = await prisma.renewToken.findMany({ skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { listing: { include: { images: true, user: { include: { roles: true } }, category: true } } } });
+    return res.apiSuccess(items, 'OK', 200);
+  } catch (e) {
+    return res.apiError('Failed to list tokens', 500);
+  }
+};

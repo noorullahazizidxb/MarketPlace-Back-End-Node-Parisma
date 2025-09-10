@@ -55,6 +55,30 @@ export const listingController = {
     }
   },
 
+  async listApproved(req, res) {
+    try {
+      const page = parseInt(req.query.page || '1', 10);
+      const perPage = parseInt(req.query.perPage || '20', 10);
+      const listings = await prisma.listing.findMany({ where: { status: 'APPROVED' }, skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
+      return res.apiSuccess(listings, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to list approved listings');
+      return res.apiError('Failed to list', 500);
+    }
+  },
+
+  async listPending(req, res) {
+    try {
+      const page = parseInt(req.query.page || '1', 10);
+      const perPage = parseInt(req.query.perPage || '20', 10);
+      const listings = await prisma.listing.findMany({ where: { status: 'PENDING' }, skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
+      return res.apiSuccess(listings, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to list pending listings');
+      return res.apiError('Failed to list', 500);
+    }
+  },
+
   async approve(req, res) {
     try {
       const { error, value } = approveListingSchema.validate(req.body);
@@ -87,7 +111,7 @@ export const listingController = {
           await storage.deletePath(prev.url);
           await prisma.listingImage.delete({ where: { id: prev.id } });
         }
-      }
+  }
 
   const img = await prisma.listingImage.create({ data: { listingId: id, url, position: 0 } });
   const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
@@ -95,6 +119,17 @@ export const listingController = {
     } catch (e) {
   console.error(e);
   return res.apiError('Upload failed', 500);
+    }
+  }
+  ,
+  async getImages(req, res) {
+    try {
+      const id = req.params.id;
+      const images = await prisma.listingImage.findMany({ where: { listingId: id }, orderBy: { position: 'asc' } });
+      return res.apiSuccess(images, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to fetch listing images');
+      return res.apiError('Failed to fetch images', 500);
     }
   }
 };
