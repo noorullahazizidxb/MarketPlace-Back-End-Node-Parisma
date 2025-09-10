@@ -1,0 +1,53 @@
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build/output
+/dist/
+/build/
+/out/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+secrets.txt
+config/local.settings.json
+
+# Common OS files
+.DS_Store
+Thumbs.db
+
+# IDEs/editors
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Logs / temp
+*.log
+*.tmp
+tmp/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Java
+*.class
+
+# Certificates / private keys
+*.key
+*.pem
+
+# Coverage
+coverage/
+*.lcov
+
+# Example: ignore a specific folder at repo root
+/temp-folder-to-ignore/
+# Example: ignore a specific file
+/path/to/ignore-me.txt
