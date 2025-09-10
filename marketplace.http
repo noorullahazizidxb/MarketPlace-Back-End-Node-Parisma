@@ -2,7 +2,7 @@
 
 @host = http://localhost:4000/api
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
-@adminToken = 
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnV5aG8wMDAwdHU4OGgxMmg2OGx3Iiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU3NDk5NDk1LCJleHAiOjE3NTgxMDQyOTV9.9VqT6xQwqLs_L6Q4NbRWEVSlE6qElcIBm0juYkqzWOE
 @listingId = 1
 
 ### Health
@@ -25,58 +25,157 @@ Content-Type: application/json
 ###
 # Role-specific registration endpoints
 
-# Register as USER (alias)
+# Register as USER (alias) - multipart with file upload (photo)
+POST {{host}}/auth/user/register
+
+--file
+Content-Disposition: form-data; name="photo"; filename="photo.jpg"
+Content-Type: image/jpeg
+
+< ./photo.jpg
+
+--file
+Content-Disposition: form-data; name="email"
+
+user1@example.com
+
+--file
+Content-Disposition: form-data; name="password"
+
+password123
+
+--file
+Content-Disposition: form-data; name="phone"
+
++93000000001
+
+--file
+Content-Disposition: form-data; name="firstName"
+
+Noor
+
+--file
+Content-Disposition: form-data; name="lastName"
+
+Azizi
+
+--file
+Content-Disposition: form-data; name="fullName"
+
+Noor Azizi
+
+--file
+Content-Disposition: form-data; name="metadata"
+
+{"preferredLanguage":"en"}
+
+###
+# Register as USER (JSON fallback) - useful if multipart client misbehaves
 POST {{host}}/auth/user/register
 Content-Type: application/json
 
 {
-  "email": "adms@example.com",
+  "email": "user1@example.com",
   "password": "password123",
   "phone": "+93000000001",
   "firstName": "Noor",
   "lastName": "Azizi",
   "fullName": "Noor Azizi",
-  "contacts": { "phone": "+93000000001", "whatsapp": "+93000000001", "telegram": "@noor" },
-  "address": { "street": "Street 10", "city": "Kabul", "country": "AF", "postalCode": "1001" },
-  "photo": "/uploads/profiles/noor.jpg",
-  "metadata": { "preferredLanguage": "en" }
+  "metadata": {"preferredLanguage":"en"}
 }
 
+
 ###
-# Register as REPRESENTATIVE (public)
+# Register as REPRESENTATIVE (public) - multipart with photo file
 POST {{host}}/auth/representative/register
-Content-Type: application/json
 
-{
-  "email": "rep1@example.com",
-  "password": "password123",
-  "phone": "+93000000002",
-  "firstName": "Rep",
-  "lastName": "One",
-  "fullName": "Rep One",
-  "contacts": { "phone": "+93000000002", "whatsapp": "+93000000002" , "primary": "+93000000002"},
-  "address": { "street": "Rep St 1", "city": "Kabul", "country": "AF" },
-  "representativeInfo": { "region": "Kabul", "whatsappNumber": "+93000000002", "active": true }
-}
+--file
+Content-Disposition: form-data; name="photo"; filename="iphone.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/iphone.jpg
+
+--file
+Content-Disposition: form-data; name="email"
+
+rep1@example.com
+
+--file
+Content-Disposition: form-data; name="password"
+
+password123
+
+--file
+Content-Disposition: form-data; name="phone"
+
++93000000002
+
+--file
+Content-Disposition: form-data; name="firstName"
+
+Rep
+
+--file
+Content-Disposition: form-data; name="lastName"
+
+One
+
+--file
+Content-Disposition: form-data; name="fullName"
+
+Rep One
+
+--file
+Content-Disposition: form-data; name="representativeInfo"
+
+{"region":"Kabul","whatsappNumber":"+93000000002","active":true}
+
 
 ###
-# Register as ADMIN (protected - requires ADMIN token)
+# Register as ADMIN (protected - requires ADMIN token) - multipart with photo
 POST {{host}}/auth/admin/register
 Authorization: Bearer {{adminToken}}
-Content-Type: application/json
 
-{
-  "email": "admin2@example.com",
-  "password": "password123",
-  "phone": "+93000000003",
-  "firstName": "Admin",
-  "lastName": "Two",
-  "fullName": "Admin Two",
-  "contacts": { "phone": "+93000000003", "whatsapp": "+93000000003" },
-  "address": { "street": "Admin St", "city": "Kabul", "country": "AF" },
-  "photo": "/uploads/profiles/admin2.jpg",
-  "metadata": { "notes": "seed admin" }
-}
+--file
+Content-Disposition: form-data; name="photo"; filename="iphone.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/iphone.jpg
+
+--file
+Content-Disposition: form-data; name="email"
+
+admin2@example.com
+
+--file
+Content-Disposition: form-data; name="password"
+
+password123
+
+--file
+Content-Disposition: form-data; name="phone"
+
++93000000003
+
+--file
+Content-Disposition: form-data; name="firstName"
+
+Admin
+
+--file
+Content-Disposition: form-data; name="lastName"
+
+Two
+
+--file
+Content-Disposition: form-data; name="fullName"
+
+Admin Two
+
+--file
+Content-Disposition: form-data; name="metadata"
+
+{"notes":"seed admin"}
 
 ###
 # Admin - stats (shows retention days, scheduled times and queue job counts)
@@ -130,7 +229,6 @@ Content-Type: application/json
 # Replace :id with listing id
 POST {{host}}/listings/{{listingId}}/images
 Authorization: Bearer {{token}}
-Content-Type: multipart/form-data
 
 --file
 Content-Disposition: form-data; name="image"; filename="sample.jpg"
@@ -142,7 +240,6 @@ Content-Type: image/jpeg
 # User photo upload (multipart)
 POST {{host}}/users/me/photo
 Authorization: Bearer {{token}}
-Content-Type: multipart/form-data
 
 --file
 Content-Disposition: form-data; name="photo"; filename="me.jpg"

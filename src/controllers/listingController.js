@@ -2,15 +2,38 @@ import { listingService } from '../services/listingService.js';
 import { createListingSchema, approveListingSchema } from '../validation/listing.js';
 import { logger } from '../utils/logger.js';
 import { prisma } from '../config/prisma.js';
+import { storage } from '../utils/storage.js';
 
 export const listingController = {
   async create(req, res) {
     try {
-      const { error, value } = createListingSchema.validate(req.body);
+      // normalize files (upload.any())
+      if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
+      const payload = { ...req.body };
+      // parse JSON fields commonly sent as strings in multipart
+      ['images','metadata'].forEach(k => { if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) {} } });
+
+      const { error, value } = createListingSchema.validate(payload);
   if (error) return res.apiError(error.message, 400);
 
   const userId = req.user?.id || 'anonymous';
   const listing = await listingService.createListing(value, userId);
+
+  // If files were uploaded in the multipart request, move them into uploads/listings/{id}
+  if (Array.isArray(req.files) && req.files.length) {
+    const uploadsDir = `uploads/listings/${listing.id}`;
+    for (let i = 0; i < req.files.length; i++) {
+      const f = req.files[i];
+      try {
+        const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
+        const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        await prisma.listingImage.create({ data: { listingId: listing.id, url, position: i } });
+      } catch (e) {
+        logger.warn({ err: e.message }, 'Failed to persist uploaded image');
+      }
+    }
+  }
+
   // reload full listing with relations for consistent API response
   const full = await prisma.listing.findUnique({ where: { id: listing.id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
   return res.apiSuccess(full, 'Created', 201);

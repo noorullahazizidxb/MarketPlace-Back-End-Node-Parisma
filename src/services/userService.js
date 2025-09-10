@@ -7,10 +7,11 @@ import { prisma } from '../config/prisma.js';
 export const userService = {
   // role: one of 'ADMIN'|'USER'|'REPRESENTATIVE'
   async register(payload, role = 'USER') {
-    const { email, phone, password, firstName, lastName, contacts, address } = payload;
+    const { email, phone, password, firstName, lastName, contacts, address, photo } = payload;
   const passwordHash = await hashPassword(password);
     const fullName = `${firstName || ''}${firstName && lastName ? ' ' : ''}${lastName || ''}`.trim() || null;
     const createData = { email, phone, passwordHash };
+    if (photo !== undefined && photo !== null) createData.photo = photo;
     if (firstName !== undefined) createData.firstName = firstName;
     if (lastName !== undefined) createData.lastName = lastName;
     if (fullName) createData.fullName = fullName;

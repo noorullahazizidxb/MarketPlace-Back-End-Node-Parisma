@@ -11,7 +11,18 @@ export const createListingSchema = Joi.object({
   location: Joi.string().allow(null, ''),
   address: Joi.string().allow(null, ''),
   contactVisibility: Joi.string().valid(...Object.values(ContactVisibility)).default(ContactVisibility.HIDE_SELLER),
-  images: Joi.array().items(Joi.string().uri()).max(10)
+  images: Joi.array().items(
+    Joi.alternatives().try(
+      // allow local path starting with / (uploads) or full http(s) URIs
+      Joi.string().pattern(/^\/|^https?:\/\//),
+      Joi.object({ url: Joi.string().pattern(/^\/|^https?:\/\//).required(), alt: Joi.string().optional(), position: Joi.number().integer().optional() })
+    )
+  ).max(10),
+  metadata: Joi.object().optional(),
+  // optional server-provided timestamps/fields that clients may include
+  expiresAt: Joi.date().iso().optional(),
+  approvedAt: Joi.date().iso().optional(),
+  approvedById: Joi.string().optional()
 });
 
 export const approveListingSchema = Joi.object({

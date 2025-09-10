@@ -1,7 +1,5 @@
 import { categoryService } from '../services/categoryService.js';
-import Joi from 'joi';
-
-const createSchema = Joi.object({ name: Joi.string().required(), slug: Joi.string().required(), parentId: Joi.number().optional() });
+import { createCategorySchema } from '../validation/category.js';
 
 export const categoryController = {
   async create(req, res) {

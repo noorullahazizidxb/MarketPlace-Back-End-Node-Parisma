@@ -1,8 +1,8 @@
 import { prisma } from '../config/prisma.js';
 import path from 'path';
-import Joi from 'joi';
 import { logger } from '../utils/logger.js';
 import { storage } from '../utils/storage.js';
+import { updateUserSchema } from '../validation/user.js';
 
 export const userController = {
   async uploadPhoto(req, res) {
@@ -31,15 +31,7 @@ export const userController = {
     try {
       const userId = req.user?.id;
       if (!userId) return res.apiError('Unauthorized', 401);
-      const contactSchema = Joi.object({ phone: Joi.string().optional(), whatsapp: Joi.string().optional(), email: Joi.string().email().optional() }).optional();
-      const addressSchema = Joi.object({ street: Joi.string().optional(), city: Joi.string().optional(), country: Joi.string().optional() }).optional();
-      const schema = Joi.object({
-        firstName: Joi.string().max(100).optional(),
-        lastName: Joi.string().max(100).optional(),
-        contacts: contactSchema,
-        address: addressSchema
-      });
-      const { error, value } = schema.validate(req.body);
+  const { error, value } = updateUserSchema.validate(req.body);
       if (error) return res.apiError(error.message, 400);
       const { firstName, lastName, contacts, address } = value;
       const data = {};
