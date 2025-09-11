@@ -297,3 +297,16 @@ model JobRecord {
 }
 
 // Soft constraints / indices for queries (per-model indices defined where appropriate)
+
+// Themes model: store design tokens and settings as JSON
+model Themes {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String   @unique
+  // JSON blob containing theme tokens and settings (colors, spacing, typography, etc.)
+  tokens    Json
+  isActive  Boolean  @default(true)
+
+  @@index([createdAt])
+}

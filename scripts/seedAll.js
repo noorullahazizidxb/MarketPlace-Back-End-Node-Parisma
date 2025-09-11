@@ -165,6 +165,26 @@ async function main() {
     await prisma.jobRecord.create({ data: { queue: 'seed', jobId: `job-${i}-${Date.now()}`, name: 'seed-job', payload: { i } } });
   }
 
+  // Default Themes (store light + dark tokens)
+  try {
+    const defaultTokens = {
+      light: {
+        color: { primary: '#0d6efd', background: '#ffffff', surface: '#f8f9fa', text: '#212529', muted: '#6c757d' },
+        spacing: { xs: 4, sm: 8, md: 16, lg: 24 },
+        typography: { fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial', baseSize: 16 }
+      },
+      dark: {
+        color: { primary: '#66b2ff', background: '#0b1220', surface: '#0f1724', text: '#e6eef8', muted: '#9aa7b3' },
+        spacing: { xs: 4, sm: 8, md: 16, lg: 24 },
+        typography: { fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial', baseSize: 16 }
+      }
+    };
+    await prisma.themes.create({ data: { name: 'default', tokens: defaultTokens, isActive: true } });
+  } catch (e) {
+    // Non-fatal: if Themes table doesn't exist yet, skip
+    console.warn('Skipping theme seed:', e.message);
+  }
+
   // Helpful info for the developer: seeded admin / representatives
   console.log('Seed summary:');
   console.log('  Admin account:', adminUser.email, '(password: password123)');

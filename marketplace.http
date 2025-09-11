@@ -382,6 +382,28 @@ GET {{host}}/categories
 # Representatives - list by region (optional query param)
 GET {{host}}/representatives?region=Kabul
 
+###
+# Themes - list all themes
+GET {{host}}/themes
+
+###
+# Themes - get default theme (replace :id if needed)
+GET {{host}}/themes/1
+
+###
+# Themes - update theme (admin)
+PUT {{host}}/themes/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "tokens": {
+    "light": { "color": { "primary": "#0d6efd", "background": "#ffffff" }, "spacing": { "md": 16 } },
+    "dark": { "color": { "primary": "#66b2ff", "background": "#0b1220" }, "spacing": { "md": 16 } }
+  },
+  "isActive": true
+}
+
 ### Jobs / retention & scheduled times (from .env)
 # These env vars control background cleanup, renew windows and feedback reminders (days)
 # UNAPPROVED_RETENTION_DAYS = 2

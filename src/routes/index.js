@@ -11,6 +11,7 @@ import rolesRouter from './roles.js';
 import adminRouter from './admin.js';
 import listingImagesRouter from './listingImages.js';
 import userRouter from './users.js';
+import themesRouter from './themes.js';
 
 export function registerRoutes(app, upload) {
   const api = express.Router();
@@ -29,6 +30,7 @@ export function registerRoutes(app, upload) {
   api.use('/admin', (req, res, next) => { res.locals.entityName = 'Admin'; next(); }, adminRouter);
   api.use('/listings', (req, res, next) => { res.locals.entityName = 'ListingImages'; next(); }, listingImagesRouter);
   api.use('/users', (req, res, next) => { res.locals.entityName = 'User'; next(); }, userRouter);
+  api.use('/themes', (req, res, next) => { res.locals.entityName = 'Themes'; next(); }, themesRouter);
 
   app.use('/api', api);
 }
