@@ -25,3 +25,27 @@ notificationController.list = async function (req, res) {
     return res.apiError('Failed to list notifications', 500);
   }
 };
+
+notificationController.get = async function (req, res) {
+  try {
+    const id = req.params.id;
+    const { prisma } = await import('../config/prisma.js');
+    const n = await prisma.notification.findUnique({ where: { id }, include: { recipients: { include: { user: { include: { roles: true } } } }, listing: { include: { images: true, user: { include: { roles: true } }, category: true } }, sender: { include: { roles: true } } } });
+    if (!n) return res.apiError('Not found', 404);
+    return res.apiSuccess(n, 'OK', 200);
+  } catch (e) {
+    return res.apiError('Failed', 500);
+  }
+};
+
+notificationController.patch = async function (req, res) {
+  try {
+    const id = req.params.id;
+    const payload = req.body;
+    const { prisma } = await import('../config/prisma.js');
+    const updated = await prisma.notification.update({ where: { id }, data: payload });
+    return res.apiSuccess(updated, 'Patched', 200);
+  } catch (e) {
+    return res.apiError('Failed', 500);
+  }
+};

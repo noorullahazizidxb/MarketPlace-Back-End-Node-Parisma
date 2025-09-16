@@ -3,9 +3,7 @@ import listingsRouter from './listings.js';
 import categoriesRouter from './categories.js';
 import representativesRouter from './representatives.js';
 import authRouter from './auth.js';
-import notificationsRouter from './notifications.js';
 import searchRouter from './search.js';
-import forwardingRouter from './forwarding.js';
 import renewRouter from './renew.js';
 import rolesRouter from './roles.js';
 import adminRouter from './admin.js';
@@ -22,9 +20,9 @@ export function registerRoutes(app, upload) {
   api.use('/categories', (req, res, next) => { res.locals.entityName = 'Category'; next(); }, categoriesRouter);
   api.use('/representatives', (req, res, next) => { res.locals.entityName = 'RepresentativeInfo'; next(); }, representativesRouter);
   api.use('/auth', (req, res, next) => { res.locals.entityName = 'Auth'; next(); }, authRouter);
-  api.use('/notifications', (req, res, next) => { res.locals.entityName = 'Notification'; next(); }, notificationsRouter);
+  // Notifications route removed: notifications are accessed via the User model now
   api.use('/search', (req, res, next) => { res.locals.entityName = 'Search'; next(); }, searchRouter);
-  api.use('/forward', (req, res, next) => { res.locals.entityName = 'Forward'; next(); }, forwardingRouter);
+  // forwarding feature removed - no longer registering /forward routes
   api.use('/renew', (req, res, next) => { res.locals.entityName = 'Renew'; next(); }, renewRouter);
   api.use('/roles', (req, res, next) => { res.locals.entityName = 'Role'; next(); }, rolesRouter);
   api.use('/admin', (req, res, next) => { res.locals.entityName = 'Admin'; next(); }, adminRouter);

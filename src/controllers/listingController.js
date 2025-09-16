@@ -57,9 +57,8 @@ export const listingController = {
 
   async listApproved(req, res) {
     try {
-      const page = parseInt(req.query.page || '1', 10);
-      const perPage = parseInt(req.query.perPage || '20', 10);
-      const listings = await prisma.listing.findMany({ where: { status: 'APPROVED' }, skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
+      // Return all approved listings without pagination as requested
+      const listings = await prisma.listing.findMany({ where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
       return res.apiSuccess(listings, 'OK', 200);
     } catch (e) {
       logger.error(e, 'Failed to list approved listings');
@@ -130,6 +129,57 @@ export const listingController = {
     } catch (e) {
       logger.error(e, 'Failed to fetch listing images');
       return res.apiError('Failed to fetch images', 500);
+    }
+  }
+  ,
+  async listByUser(req, res) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.apiError('Unauthorized', 401);
+      const page = parseInt(req.query.page || '1', 10);
+      const perPage = parseInt(req.query.perPage || '50', 10);
+      const listings = await prisma.listing.findMany({ where: { userId }, skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { images: true, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: true } });
+      return res.apiSuccess(listings, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to list user listings');
+      return res.apiError('Failed to list', 500);
+    }
+  }
+  ,
+  async update(req, res) {
+    try {
+      const id = req.params.id;
+      const payload = req.body;
+      const data = { ...payload };
+      // prevent changing immutable fields
+      delete data.id;
+      delete data.createdAt;
+      delete data.userId;
+      const updated = await prisma.listing.update({ where: { id }, data });
+      const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+      return res.apiSuccess(full, 'Updated', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to update listing');
+      return res.apiError('Update failed', 500);
+    }
+  },
+
+  async patch(req, res) {
+    try {
+      const id = req.params.id;
+      const payload = req.body;
+      const data = {};
+      // copy only provided fields
+      for (const k of Object.keys(payload)) {
+        if (['id','createdAt','userId'].includes(k)) continue;
+        data[k] = payload[k];
+      }
+      const updated = await prisma.listing.update({ where: { id }, data });
+      const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+      return res.apiSuccess(full, 'Patched', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to patch listing');
+      return res.apiError('Patch failed', 500);
     }
   }
 };

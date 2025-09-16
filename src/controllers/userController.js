@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { storage } from '../utils/storage.js';
 import { updateUserSchema } from '../validation/user.js';
 
+
 export const userController = {
   async uploadPhoto(req, res) {
     try {
@@ -47,6 +48,47 @@ export const userController = {
       logger.error(e, 'Failed to update profile');
       res.apiError('Update failed', 500);
     }
+  }
+};
+
+userController.get = async function (req, res) {
+  try {
+    const id = req.params.id;
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    if (!user) return res.apiError('Not found', 404);
+    res.apiSuccess(user, 'OK', 200);
+  } catch (e) {
+    logger.error(e, 'Failed to get user');
+    res.apiError('Failed', 500);
+  }
+};
+
+userController.updateById = async function (req, res) {
+  try {
+    const id = req.params.id;
+    const { error, value } = updateUserSchema.validate(req.body);
+    if (error) return res.apiError(error.message, 400);
+    await prisma.user.update({ where: { id }, data: value });
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    res.apiSuccess(user, 'Updated', 200);
+  } catch (e) {
+    logger.error(e, 'Failed to update user by id');
+    res.apiError('Failed', 500);
+  }
+};
+
+userController.patchById = async function (req, res) {
+  try {
+    const id = req.params.id;
+    const payload = req.body;
+    const data = {};
+    for (const k of Object.keys(payload)) data[k] = payload[k];
+    await prisma.user.update({ where: { id }, data });
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    res.apiSuccess(user, 'Patched', 200);
+  } catch (e) {
+    logger.error(e, 'Failed to patch user by id');
+    res.apiError('Failed', 500);
   }
 };
 

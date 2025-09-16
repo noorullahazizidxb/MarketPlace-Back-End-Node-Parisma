@@ -120,6 +120,7 @@ CREATE TABLE `ListingFeedback` (
     `listingId` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `statusAfter` ENUM('PENDING', 'APPROVED', 'REJECTED', 'SOLD', 'RENTED', 'EXPIRED', 'DRAFT', 'HIDDEN') NOT NULL,
+    `rating` INTEGER NULL,
     `comment` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -223,6 +224,20 @@ CREATE TABLE `JobRecord` (
     INDEX `JobRecord_queue_idx`(`queue`),
     INDEX `JobRecord_name_idx`(`name`),
     INDEX `JobRecord_status_idx`(`status`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Themes` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `tokens` JSON NOT NULL,
+    `isActive` BOOLEAN NOT NULL DEFAULT true,
+
+    UNIQUE INDEX `Themes_name_key`(`name`),
+    INDEX `Themes_createdAt_idx`(`createdAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

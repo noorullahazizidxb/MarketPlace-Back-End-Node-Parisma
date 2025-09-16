@@ -33,6 +33,21 @@ export const themeController = {
     }
   },
 
+  async updateDefaultTokens(req, res) {
+    try {
+      const tokens = req.body && req.body.tokens;
+      if (typeof tokens === 'undefined') return res.apiError('Missing tokens in request body', 400);
+      const id = 1;
+      const existing = await prisma.themes.findUnique({ where: { id } });
+      if (!existing) return res.apiError('Default theme not found', 404);
+      const updated = await prisma.themes.update({ where: { id }, data: { tokens } });
+      return res.apiSuccess(updated, 'Tokens updated', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to update default theme tokens');
+      return res.apiError('Failed to update tokens', 500);
+    }
+  },
+
   async get(req, res) {
     try {
       const id = Number(req.params.id);

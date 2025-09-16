@@ -4,6 +4,13 @@
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
 @adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnV5aG8wMDAwdHU4OGgxMmg2OGx3Iiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU3NDk5NDk1LCJleHAiOjE3NTgxMDQyOTV9.9VqT6xQwqLs_L6Q4NbRWEVSlE6qElcIBm0juYkqzWOE
 @listingId = cmfdwnrdo0000tur0iubjermu
+@userId = USER_ID
+@notificationId = NOTIFICATION_ID
+@forwardId = 1
+@renewTokenId = 1
+@categoryId = 1
+@representativeId = 1
+@roleAssignmentId = 1
 
 ### Health
 GET {{host}}/health
@@ -19,7 +26,7 @@ Content-Type: application/json
 
 {
   "email": "admin@example.com",
-  "password": "password123"
+  "password": "ChangeMe123!"
 }
 
 ###
@@ -208,16 +215,16 @@ Content-Type: application/json
 
 ###
 # Listings - get
-GET {{host}}/listings/{{listingId}}
+GET {{host}}/listings/cmff5cbxv0041tu5c1vf24px8
 
 ###
 # Listings - list approved (public)
 GET {{host}}/listings
 
 ###
-# Listings - list pending (admin)
+# Listings - list pending (requires authentication)
 GET {{host}}/listings/pending
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{token}}
 
 ###
 # Listings - approve (admin)
@@ -244,6 +251,10 @@ Content-Disposition: form-data; name="image"; filename="sample.jpg"
 Content-Type: image/jpeg
 
 < ./fixtures/sample.jpg
+
+###
+# Listing images - get
+GET {{host}}/listings/{{listingId}}/images
 
 ###
 # User photo upload (multipart)
@@ -280,10 +291,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "listingId": {{listingId}},
-  "requestedBy": "{{token}}",
-  "notes": "Requesting 30 day renew",
-  "expiresInDays": 30
+  "listingId": "{{listingId}}"
 }
 
 ###
@@ -308,7 +316,7 @@ Content-Type: application/json
   "message": "This is a test",
   "channel": "WHATSAPP",
   "targetType": "USER",
-  "recipientUserIds": ["1"],
+  "recipientUserIds": ["{{userId}}"],
   "listingId": "{{listingId}}",
   "meta": { "urgent": true },
   "triggerEvent": "MANUAL_TEST"
@@ -316,20 +324,8 @@ Content-Type: application/json
 
 ###
 # Forward listing to reps (requires auth)
-POST {{host}}/forward
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "listingId": "{{listingId}}",
-  "region": "Kabul",
-  "buyerMessage": "Interested buyer",
-  "buyerContact": "+93000000000",
-  "buyerName": "Ali",
-  "buyerEmail": "ali@example.com",
-  "preferredChannel": "WHATSAPP",
-  "notes": "Please ask for viewing times"
-}
+### Forwarding feature removed from API
+### Reason: application flow simplified - buyers contact sellers/representatives directly
 
 ###
 # Roles - assign (admin)
@@ -346,7 +342,7 @@ Content-Type: application/json
 
 ###
 # Roles - list user roles (admin)
-GET {{host}}/roles/user/2
+GET {{host}}/roles/user/{{userId}}
 Authorization: Bearer {{adminToken}}
 
 ###
@@ -360,14 +356,57 @@ GET {{host}}/users
 Authorization: Bearer {{adminToken}}
 
 ###
-# Notifications - list
-GET {{host}}/notifications
+# Users - get by id
+GET {{host}}/users/{{userId}}
 Authorization: Bearer {{adminToken}}
 
 ###
-# Forwarding - list forwarded history
-GET {{host}}/forward
+# Users - get my listings (authenticated)
+GET {{host}}/users/me/listings
+Authorization: Bearer {{token}}
+
+###
+# Users - update by id
+PUT {{host}}/users/{{userId}}
 Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Updated",
+  "lastName": "User",
+  "contacts": { "phone": "+93000000009" }
+}
+
+###
+# Users - patch by id
+PATCH {{host}}/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "address": { "city": "Kabul" }
+}
+
+
+###
+# Notifications - list (public)
+GET {{host}}/notifications
+
+###
+# Notifications - get by id (public)
+GET {{host}}/notifications/{{notificationId}}
+
+###
+# Notifications - patch (requires auth)
+PATCH {{host}}/notifications/{{notificationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "readAt": "2025-09-10T12:00:00.000Z"
+}
+
+### Forwarding routes removed
 
 ###
 # Renew - list tokens
@@ -375,20 +414,127 @@ GET {{host}}/renew/tokens
 Authorization: Bearer {{adminToken}}
 
 ###
+# Renew - get token by id
+GET {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+
+###
+# Renew - update token
+PUT {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "used": true
+}
+
+###
+# Renew - patch token
+PATCH {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "expiresAt": "2025-12-31T00:00:00.000Z"
+}
+
+###
+# Renew - delete token
+DELETE {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+
+###
 # Categories - list
 GET {{host}}/categories
+
+###
+# Categories - create (requires auth)
+POST {{host}}/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Apartments",
+  "slug": "apartments",
+  "isActive": true
+}
+
+###
+# Categories - get by id
+GET {{host}}/categories/{{categoryId}}
+
+#
+# Categories - update (requires auth)
+PUT {{host}}/categories/{{categoryId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Updated Apartments"
+}
+
+#
+# Categories - patch (requires auth)
+PATCH {{host}}/categories/{{categoryId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
 
 ###
 # Representatives - list by region (optional query param)
 GET {{host}}/representatives?region=Kabul
 
 ###
-# Themes - list all themes
-GET {{host}}/themes
+# Representatives - get by id
+GET {{host}}/representatives/{{representativeId}}
 
 ###
-# Themes - get default theme (replace :id if needed)
+### Representatives - update
+PUT {{host}}/representatives/{{representativeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "active": true
+}
+
+#
+### Representatives - patch
+PATCH {{host}}/representatives/{{representativeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "whatsappNumber": "+93000000002"
+}
+
+###
+# Themes - list all themes (admin only)
+GET {{host}}/themes
+Authorization: Bearer {{adminToken}}
+
+###
+# Themes - get default theme (replace :id if needed) (admin only)
 GET {{host}}/themes/1
+Authorization: Bearer {{adminToken}}
+
+###
+# Themes - create (admin)
+POST {{host}}/themes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "default",
+  "tokens": {
+    "light": { "color": { "primary": "#0d6efd" } },
+    "dark": { "color": { "primary": "#66b2ff" } }
+  },
+  "isActive": true
+}
 
 ###
 # Themes - update theme (admin)
@@ -404,6 +550,57 @@ Content-Type: application/json
   "isActive": true
 }
 
+###
+# Listings - update by id
+PUT {{host}}/listings/{{listingId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Updated title",
+  "price": 250,
+  "currency": "USD"
+}
+
+###
+# Listings - patch by id
+PATCH {{host}}/listings/{{listingId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "APPROVED"
+}
+
+###
+# Roles - get by id (admin)
+GET {{host}}/roles/{{roleAssignmentId}}
+Authorization: Bearer {{adminToken}}
+
+###
+# Roles - update (admin)
+PUT {{host}}/roles/{{roleAssignmentId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "REPRESENTATIVE"
+}
+
+###
+# Roles - patch (admin)
+PATCH {{host}}/roles/{{roleAssignmentId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "USER"
+}
+
+###
+# Roles - delete (admin)
+DELETE {{host}}/roles/{{roleAssignmentId}}
+Authorization: Bearer {{adminToken}}
 ### Jobs / retention & scheduled times (from .env)
 # These env vars control background cleanup, renew windows and feedback reminders (days)
 # UNAPPROVED_RETENTION_DAYS = 2

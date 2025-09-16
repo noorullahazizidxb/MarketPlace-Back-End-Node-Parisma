@@ -7,7 +7,7 @@ async function seed() {
   const email = process.env.ADMIN_EMAIL || 'admin@example.com';
   const phone = process.env.ADMIN_PHONE || null;
   const password = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
-  const passwordHash = hashPassword(password);
+  const passwordHash = await hashPassword(password);
   const user = await prisma.user.upsert({ where: { email }, update: { passwordHash }, create: { email, phone, passwordHash } });
   console.log('Admin user created:', user.id);
   await prisma.userRole.upsert({ where: { userId_role: { userId: user.id, role: 'ADMIN' } }, update: {}, create: { userId: user.id, role: 'ADMIN' } });

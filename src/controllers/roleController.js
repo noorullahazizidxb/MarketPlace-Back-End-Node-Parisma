@@ -25,3 +25,38 @@ roleController.listAll = async function (req, res) {
     return res.apiError('Failed to list roles', 500);
   }
 };
+
+roleController.get = async function (req, res) {
+  const id = Number(req.params.id);
+  const r = await prisma.userRole.findUnique({ where: { id }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+  if (!r) return res.apiError('Not found', 404);
+  res.apiSuccess(r, 'OK', 200);
+};
+
+roleController.update = async function (req, res) {
+  try {
+    const id = Number(req.params.id);
+    const data = req.body;
+    const updated = await prisma.userRole.update({ where: { id }, data });
+    res.apiSuccess(updated, 'Updated', 200);
+  } catch (e) { res.apiError('Failed', 500); }
+};
+
+roleController.patch = async function (req, res) {
+  try {
+    const id = Number(req.params.id);
+    const payload = req.body;
+    const data = {};
+    for (const k of Object.keys(payload)) data[k] = payload[k];
+    const updated = await prisma.userRole.update({ where: { id }, data });
+    res.apiSuccess(updated, 'Patched', 200);
+  } catch (e) { res.apiError('Failed', 500); }
+};
+
+roleController.remove = async function (req, res) {
+  try {
+    const id = Number(req.params.id);
+    await prisma.userRole.delete({ where: { id } });
+    res.apiSuccess(null, 'Deleted', 200);
+  } catch (e) { res.apiError('Failed', 500); }
+};
