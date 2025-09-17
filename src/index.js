@@ -22,6 +22,8 @@ import './workers/statusCleanupWorker.js';
 import './workers/feedbackWorker.js';
 
 const app = express();
+import http from 'http';
+import { initWebsockets } from './websocket/socket.js';
 const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
@@ -79,7 +81,13 @@ async function start() {
     logger.warn(e, 'Failed to schedule recurring jobs');
   }
 
-  app.listen(config.port, () => logger.info(`API listening on :${config.port}`));
+  const server = http.createServer(app);
+  try {
+    initWebsockets(server);
+  } catch (e) {
+    logger.warn(e, 'Failed to initialize websockets');
+  }
+  server.listen(config.port, () => logger.info(`API listening on :${config.port}`));
 }
 
 start().catch(e => {

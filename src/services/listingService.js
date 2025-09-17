@@ -68,6 +68,17 @@ export const listingService = {
   const key = `listing:${id}`;
   const listing = await cachedResponse(key, async () => await listingRepository.getById(id), 60);
   if (!listing) return null;
+    // attach feedback stats
+    if (Array.isArray(listing.feedbacks) && listing.feedbacks.length) {
+      const ratings = listing.feedbacks.map(f => typeof f.rating === 'number' ? f.rating : null).filter(v => v !== null);
+      const count = ratings.length;
+      const avg = count ? (ratings.reduce((a,b)=>a+b,0) / count) : 0;
+      listing.reviewCount = listing.feedbacks.length;
+      listing.averageRating = avg;
+    } else {
+      listing.reviewCount = 0;
+      listing.averageRating = 0;
+    }
     // enforce contact visibility: return platform contact placeholders if hidden
     if (listing.contactVisibility === 'HIDE_SELLER') {
       // remove sensitive user contact fields
@@ -87,6 +98,21 @@ export const listingService = {
     };
 
   const listing = await listingRepository.update(listingId, data);
+
+    // If seller is hidden, bind representatives whose region matches listing location
+    try {
+      const visibility = data.contactVisibility;
+      const region = (listing.location || '').trim();
+      if (visibility === 'HIDE_SELLER' && region) {
+        const reps = await prisma.representativeInfo.findMany({ where: { active: true, region } });
+        if (reps && reps.length) {
+          const rows = reps.map(r => ({ listingId: listing.id, representativeId: r.id }));
+          await prisma.listingRepresentative.createMany({ data: rows, skipDuplicates: true });
+        }
+      }
+    } catch (e) {
+      logger.warn(e, 'Failed to bind representatives during approval');
+    }
 
     // push an index job to ensure ES is updated
     try {
@@ -119,5 +145,35 @@ export const listingService = {
   try { await redisDel(`listing:${full.id}`); } catch (e) {}
   logger.info({ listingId, adminId }, 'Listing approved');
   return full;
+  }
+  ,
+  async rejectListing(listingId, adminId, opts = {}) {
+    const data = {
+      status: 'REJECTED',
+      approvedById: adminId,
+    };
+    const listing = await listingRepository.update(listingId, data);
+
+    // Create a notification to the owner about rejection
+    try {
+      await prisma.notification.create({
+        data: {
+          title: 'Your listing was rejected',
+          message: `Your listing \"${listing.title}\" has been rejected by admin.`,
+          channel: 'SYSTEM',
+          targetType: 'USER',
+          senderId: adminId,
+          listingId: listing.id,
+          recipients: { create: [{ userId: listing.userId }] }
+        }
+      });
+    } catch (e) {
+      logger.warn(e, 'Failed to create rejection notification');
+    }
+
+    // invalidate cache
+    try { await redisDel(`listing:${listing.id}`); } catch (e) {}
+    logger.info({ listingId, adminId }, 'Listing rejected');
+    return listing;
   }
 };

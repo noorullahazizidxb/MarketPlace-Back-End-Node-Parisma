@@ -501,6 +501,32 @@ Content-Type: application/json
   "active": true
 }
 
+###
+# Listing Feedbacks
+
+### Create feedback (authenticated)
+POST {{host}}/feedbacks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "listingId": "{{listingId}}",
+  "rating": 5,
+  "comment": "Great place, very clean.",
+  "statusAfter": "APPROVED"
+}
+
+### List feedbacks for a listing (public)
+GET {{host}}/feedbacks/listing/{{listingId}}
+
+### Get feedback by id
+GET {{host}}/feedbacks/1
+
+### Delete feedback (owner or admin)
+DELETE {{host}}/feedbacks/1
+Authorization: Bearer {{token}}
+
+
 #
 ### Representatives - patch
 PATCH {{host}}/representatives/{{representativeId}}
@@ -622,3 +648,23 @@ Authorization: Bearer {{adminToken}}
 # - Representative samples: user1@example.com .. user5@example.com (password: password123)
 # To obtain an admin token using the Rest Client above: first run the login request
 # with the admin credentials and paste the returned token into the {{adminToken}} variable.
+
+###
+# Notifications - mark a single notification read (authenticated)
+PATCH {{host}}/notifications/{{notificationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "readAt": "2025-09-17T12:43:51.948Z"
+}
+
+###
+# Notifications - mark all notifications read for current user (authenticated)
+PATCH {{host}}/notifications/mark-all-read
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "readAt": "2025-09-17T12:43:51.948Z"
+}

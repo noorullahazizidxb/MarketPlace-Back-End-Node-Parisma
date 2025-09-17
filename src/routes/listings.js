@@ -10,6 +10,10 @@ const upload = multer({ dest: 'tmp/uploads' });
 router.get('/', listingController.listApproved);
 // List pending/unapproved listings (admin)
 router.get('/pending', requireAuth, listingController.listPending);
+// Real-time approvals: broadcast pending listings to admin clients
+router.get('/for-approval', requireAuth, listingController.forApproval);
+// Force emit all pending listings to admin sockets (admin only)
+router.post('/for-approval/emit-all', requireAuth, listingController.emitAllForApproval);
 // Create a listing (user) - accept multipart/form-data (files + fields)
 router.post('/', requireAuth, upload.any(), listingController.create);
 
@@ -20,7 +24,12 @@ router.get('/:id', listingController.get);
 router.put('/:id', requireAuth, listingController.update);
 router.patch('/:id', requireAuth, listingController.patch);
 
+// Update contact visibility and bind representatives by location when hiding seller
+router.post('/:id', requireAuth, listingController.updateVisibilityAndBindReps);
+
 // Admin approval (still requires authentication; role checks handled in controller/service if needed)
 router.post('/:id/approve', requireAuth, listingController.approve);
+// Admin reject
+router.post('/:id/reject', requireAuth, listingController.reject);
 
 export default router;

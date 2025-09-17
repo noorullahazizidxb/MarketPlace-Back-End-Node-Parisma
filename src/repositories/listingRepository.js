@@ -13,7 +13,8 @@ export const listingRepository = {
   images: true,
   representatives: { include: { representative: true } },
   user: { include: { roles: true } },
-  category: true
+  category: true,
+  feedbacks: { include: { user: { select: { id: true, fullName: true, firstName: true, lastName: true, photo: true } } } }
       }
     });
   },
