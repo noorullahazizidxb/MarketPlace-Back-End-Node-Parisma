@@ -168,18 +168,135 @@ async function main() {
   // Default Themes (store light + dark tokens)
   try {
     const defaultTokens = {
-      light: {
-        color: { primary: '#0d6efd', background: '#ffffff', surface: '#f8f9fa', text: '#212529', muted: '#6c757d' },
-        spacing: { xs: 4, sm: 8, md: 16, lg: 24 },
-        typography: { fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial', baseSize: 16 }
+      id: 'next-like-001',
+      name: 'Next-like Default',
+      notes: 'Store as-is in a MySQL JSON column. When applying at runtime, map token css strings into CSS variables (e.g., set --background: hsl(...)). Scales provide sizes and design tokens for UI components.',
+      scales: {
+        font: {
+          sizes: {
+            lg: '18px',
+            md: '16px',
+            sm: '14px',
+            xl: '20px',
+            xs: '12px',
+            '2xl': '24px',
+            '3xl': '30px'
+          },
+          family: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+          weights: {
+            bold: 700,
+            medium: 500,
+            regular: 400,
+            semibold: 600,
+            extrabold: 800
+          },
+          lineHeights: {
+            tight: 1.1,
+            normal: 1.4,
+            relaxed: 1.6
+          }
+        },
+        radii: {
+          lg: '18px',
+          md: '12px',
+          sm: '6px',
+          xl: '24px',
+          round: '9999px'
+        },
+        shadow: {
+          lg: '0 20px 60px rgba(2,6,23,0.18)',
+          md: '0 6px 18px rgba(2,6,23,0.12)',
+          sm: '0 1px 2px rgba(0,0,0,0.04)',
+          none: 'none',
+          glass: '0 8px 30px rgba(2,6,23,0.12), inset 0 -6px 20px rgba(255,255,255,0.02)'
+        },
+        zIndex: {
+          base: 10,
+          modal: 90,
+          overlay: 70,
+          dropdown: 60
+        },
+        spacing: {
+          lg: '24px',
+          md: '16px',
+          sm: '8px',
+          xl: '32px',
+          xs: '4px',
+          xxl: '48px'
+        },
+        borderWidth: {
+          thin: '1px',
+          thick: '2px',
+          regular: '1.5px'
+        },
+        transitions: {
+          fast: '150ms cubic-bezier(.2,.9,.2,1)',
+          slow: '350ms cubic-bezier(.2,.9,.2,1)',
+          normal: '250ms cubic-bezier(.2,.9,.2,1)',
+          spring: {
+            type: 'spring',
+            damping: 30,
+            stiffness: 300
+          }
+        }
       },
-      dark: {
-        color: { primary: '#66b2ff', background: '#0b1220', surface: '#0f1724', text: '#e6eef8', muted: '#9aa7b3' },
-        spacing: { xs: 4, sm: 8, md: 16, lg: 24 },
-        typography: { fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial', baseSize: 16 }
-      }
+      tokens: {
+        dark: {
+          card: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
+          input: { css: 'hsl(240 3.8% 23%)', hsl: '240 3.8% 23%' },
+          muted: { css: 'hsl(240 3.7% 15.9%)', hsl: '240 3.7% 15.9%' },
+          accent: { css: 'hsl(260 89% 66%)', hsl: '260 89% 66%' },
+          border: { css: 'hsl(240 3.8% 23%)', hsl: '240 3.8% 23%' },
+          primary: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
+          secondary: { css: 'hsl(240 3.7% 15.9%)', hsl: '240 3.7% 15.9%' },
+          background: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
+          foreground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
+          accentForeground: { css: 'hsl(235 100% 95%)', hsl: '235 100% 95%' },
+          primaryForeground: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
+          secondaryForeground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' }
+        },
+        light: {
+          card: { css: 'hsl(0 0% 100%)', hsl: '0 0% 100%' },
+          input: { css: 'hsl(240 5.9% 90%)', hsl: '240 5.9% 90%' },
+          muted: { css: 'hsl(240 4.8% 95.9%)', hsl: '240 4.8% 95.9%' },
+          accent: { css: 'hsl(260 89% 66%)', hsl: '260 89% 66%' },
+          border: { css: 'hsl(240 5.9% 90%)', hsl: '240 5.9% 90%' },
+          primary: { css: 'hsl(0 0% 7%)', hsl: '0 0% 7%' },
+          secondary: { css: 'hsl(240 4.8% 95.9%)', hsl: '240 4.8% 95.9%' },
+          background: { css: 'hsl(0 0% 100%)', hsl: '0 0% 100%' },
+          foreground: { css: 'hsl(240 10% 3.9%)', hsl: '240 10% 3.9%' },
+          accentForeground: { css: 'hsl(235 100% 95%)', hsl: '235 100% 95%' },
+          primaryForeground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
+          secondaryForeground: { css: 'hsl(240 10% 3.9%)', hsl: '240 10% 3.9%' }
+        }
+      },
+      editable: true,
+      createdAt: '2025-09-13T00:00:00Z',
+      components: {
+        card: {
+          border: { token: 'border', width: 'thin' },
+          radius: 'lg',
+          shadow: 'md',
+          background: { token: 'card' }
+        },
+        button: {
+          primary: {
+            color: { token: 'primaryForeground' },
+            radius: 'md',
+            shadow: 'sm',
+            background: { token: 'primary' },
+            transition: 'fast'
+          }
+        },
+        navbar: {
+          border: { token: 'border', width: 'regular' },
+          shadow: 'none',
+          background: { token: 'background' }
+        }
+      },
+      description: 'Next.js-inspired light + dark theme tokens and scales for dynamic theming.'
     };
-    await prisma.themes.create({ data: { name: 'default', tokens: defaultTokens, isActive: true } });
+  await prisma.themes.create({ data: { name: 'default', tokens: defaultTokens, isActive: true } });
   } catch (e) {
     // Non-fatal: if Themes table doesn't exist yet, skip
     console.warn('Skipping theme seed:', e.message);

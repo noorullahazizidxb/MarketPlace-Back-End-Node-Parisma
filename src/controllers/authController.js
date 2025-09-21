@@ -102,4 +102,15 @@ export const authController = {
   const full = await userService.getFullUser(user.id);
   res.apiSuccess({ token, user: full }, 'OK', 200);
   }
+  ,
+  async profile(req, res) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.apiError('Unauthorized', 401);
+      const full = await userService.getFullUser(userId);
+      return res.apiSuccess(full, 'OK', 200);
+    } catch (e) {
+      return res.apiError('Failed to load profile', 500);
+    }
+  }
 };

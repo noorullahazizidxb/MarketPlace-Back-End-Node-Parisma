@@ -73,6 +73,7 @@ model User {
   fullName          String?
   contacts          Json?
   address           Json?
+  metadata          Json?         // arbitrary profile / preference data
   passwordHash      String
   roles             UserRole[]
   listings          Listing[]
@@ -211,7 +212,7 @@ model ListingRenewToken {
   token     String   @unique
   issuedAt  DateTime @default(now())
   expiresAt DateTime
-  used      Boolean  @default(false)
+  used      Int?      @default(0) // number of times the token has been used to renew
 
   @@index([expiresAt])
 }
@@ -310,3 +311,4 @@ model Themes {
 
   @@index([createdAt])
 }
+

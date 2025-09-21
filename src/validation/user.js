@@ -5,7 +5,11 @@ export const contactSchema = Joi.object({
   whatsapp: Joi.string().optional(),
   email: Joi.string().email().optional(),
   telegram: Joi.string().optional(),
-  preferred: Joi.string().valid('phone','whatsapp','email','telegram').optional()
+  preferred: Joi.string().valid('phone','whatsapp','email','telegram').optional(),
+  linkedIn:Joi.string().optional(),
+  facebook:Joi.string().optional(),
+  instagram:Joi.string().optional(),
+  website:Joi.string().optional()
 }).optional();
 
 export const addressSchema = Joi.object({

@@ -13,6 +13,8 @@ export const listingFeedbackController = {
       // Optional: prevent duplicate feedbacks by same user for same listing if desired
       const fb = await prisma.listingFeedback.create({ data: { listingId, userId, rating: rating ?? null, comment: comment ?? null, statusAfter: statusAfter ?? undefined } });
       const full = await prisma.listingFeedback.findUnique({ where: { id: fb.id }, include: { user: { include: { roles: true } } } });
+      // Invalidate cached listing so subsequent GET /listing/:id returns fresh feedbacks
+      try { const { redisDel } = await import('../utils/redisCache.js'); await redisDel(`listing:${listingId}`); } catch (e) {}
       return res.apiSuccess(full, 'Created', 201);
     } catch (e) {
       logger.error(e, 'Failed to create feedback');
@@ -61,6 +63,7 @@ export const listingFeedbackController = {
       const roles = req.user.roles || [];
       if (fb.userId !== userId && !roles.includes('ADMIN')) return res.apiError('Forbidden', 403);
       await prisma.listingFeedback.delete({ where: { id } });
+      try { const { redisDel } = await import('../utils/redisCache.js'); await redisDel(`listing:${fb.listingId}`); } catch (e) {}
       return res.apiSuccess({}, 'Deleted', 200);
     } catch (e) {
       logger.error(e, 'Failed to delete feedback');

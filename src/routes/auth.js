@@ -16,4 +16,6 @@ router.post('/representative/register', upload.any(), authController.registerRep
 router.post('/admin/register', attachAuth, requireAuth, requireRole(Roles.ADMIN), upload.any(), authController.registerAdmin);
 
 router.post('/login', authController.login);
+// returns full authenticated user profile and related data
+router.get('/profile', attachAuth, requireAuth, authController.profile);
 export default router;

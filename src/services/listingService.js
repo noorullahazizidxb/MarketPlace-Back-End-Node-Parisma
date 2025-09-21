@@ -1,4 +1,5 @@
 import { listingRepository } from '../repositories/listingRepository.js';
+import { renewRepository } from '../repositories/renewRepository.js';
 import { queues, QUEUES } from '../jobs/queues.js';
 import { prisma } from '../config/prisma.js';
 import { config } from '../config/index.js';
@@ -7,14 +8,10 @@ import { cachedResponse, redisSet, redisDel } from '../utils/redisCache.js';
 
 export const listingService = {
   async createListing(payload, userId) {
-    // use client-provided expiresAt if valid, otherwise default to configured expiry
+    // use client-provided expiresAt if valid; no default expiry applied
     let expiresAt;
     if (payload.expiresAt) {
       try { expiresAt = new Date(payload.expiresAt); if (isNaN(expiresAt)) expiresAt = null; } catch (e) { expiresAt = null; }
-    }
-    if (!expiresAt) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + config.retention.listingDefaultExpiryDays);
     }
 
     const data = {
@@ -34,6 +31,22 @@ export const listingService = {
     };
 
     const listing = await listingRepository.create(data);
+
+    // Notify the owner that the listing is pending approval
+    try {
+      await prisma.notification.create({
+        data: {
+          title: 'Listing submitted - pending approval',
+          message: `Your listing "${listing.title}" has been submitted and is pending admin approval. It will not be visible until approved. Please wait for confirmation.`,
+          channel: 'SYSTEM',
+          targetType: 'USER',
+          listingId: listing.id,
+          recipients: { create: [{ userId }] }
+        }
+      });
+    } catch (e) {
+      logger.warn(e, 'Failed to create pending approval notification for listing');
+    }
 
     // images: if provided as array (either urls or objects with url/alt/position), create ListingImage entries
     if (payload.images && payload.images.length) {
@@ -79,22 +92,23 @@ export const listingService = {
       listing.reviewCount = 0;
       listing.averageRating = 0;
     }
-    // enforce contact visibility: return platform contact placeholders if hidden
-    if (listing.contactVisibility === 'HIDE_SELLER') {
-      // remove sensitive user contact fields
-      const safeUser = { id: listing.user.id, name: listing.user.email ? listing.user.email : null };
-      listing.user = safeUser;
-    }
+    // Return full user info regardless of contactVisibility (per requirement)
   return listing;
   },
 
   async approveListing(listingId, adminId, opts = {}) {
     const approvedAt = new Date();
+    // Set initial listing expiry window from approval time
+    const expiresAt = new Date();
+    try {
+      expiresAt.setDate(expiresAt.getDate() + (config.retention.renewWindowDays || 0));
+    } catch (e) {}
     const data = {
       status: 'APPROVED',
       approvedAt,
       approvedById: adminId,
-      contactVisibility: opts.contactVisibility || 'HIDE_SELLER'
+      contactVisibility: opts.contactVisibility || 'HIDE_SELLER',
+      expiresAt
     };
 
   const listing = await listingRepository.update(listingId, data);
@@ -138,6 +152,31 @@ export const listingService = {
         recipients: { create: [{ userId: listing.userId }] }
       }
     });
+
+    // Issue renew token valid for RENEW_WINDOW_DAYS
+    try {
+      const { renewService } = await import('../services/renewService.js');
+      await renewService.issueToken(listing.id);
+    } catch (e) {
+      // Log full error for debugging
+      logger.warn({ err: e && e.stack ? e.stack : e }, 'Failed to issue renew token on approval - attempting fallback');
+      try {
+        // Ensure listing.expiresAt is set (use computed expiresAt above)
+        if (!listing.expiresAt) {
+          const expiresAtFallback = new Date();
+          expiresAtFallback.setDate(expiresAtFallback.getDate() + (config.retention.renewWindowDays || 0));
+          await prisma.listing.update({ where: { id: listing.id }, data: { expiresAt: expiresAtFallback } });
+        }
+        // Create token directly if missing
+        const existingToken = await prisma.listingRenewToken.findUnique({ where: { listingId: listing.id } });
+        if (!existingToken) {
+          await renewRepository.createToken(listing.id, listing.expiresAt || new Date());
+          logger.info({ listingId: listing.id }, 'Fallback: created renew token directly after failed issue');
+        }
+      } catch (fallbackErr) {
+        logger.error({ err: fallbackErr && fallbackErr.stack ? fallbackErr.stack : fallbackErr }, 'Fallback token creation failed');
+      }
+    }
 
   // reload with relations
   const full = await listingRepository.getById(listing.id);

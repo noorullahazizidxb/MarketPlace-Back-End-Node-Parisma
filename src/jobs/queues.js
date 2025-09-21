@@ -7,10 +7,9 @@ import { logger } from '../utils/logger.js';
 
 export const QUEUES = {
   MODERATION_CLEANUP: 'moderation-cleanup',
-  STATUS_CLEANUP: 'status-cleanup',
-  FEEDBACK_REMINDER: 'feedback-reminder',
   SEARCH_INDEX: 'search-index',
-  NOTIFICATION_DISPATCH: 'notification-dispatch'
+  NOTIFICATION_DISPATCH: 'notification-dispatch',
+  RENEWAL_REMINDER: 'renewal-reminder'
 };
 
 const connections = {};

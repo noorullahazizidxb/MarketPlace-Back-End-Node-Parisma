@@ -281,27 +281,67 @@ Content-Type: application/json
   "photo": "/uploads/profiles/noor.jpg",
   "contacts": { "phone": "+93000000001", "whatsapp": "+93000000001" , "preferred": "whatsapp" },
   "address": { "street": "Street 10", "city": "Kabul", "country": "AF", "unit": "Apt 5" },
-  "metadata": { "language": "en", "timezone": "Asia/Kabul" }
 }
 
 ###
-# Renew - issue token (requires auth)
-POST {{host}}/renew/issue
+# Renew tokens and profile (note: POST /renew/issue was removed)
+# Tokens are now issued automatically when a listing is APPROVED by an admin.
+# Use the profile endpoint to inspect your user data (includes listings and renewTokens),
+# or list tokens directly via the tokens endpoint.
+
+###
+# Auth - profile (authenticated)
+GET {{host}}/auth/profile
+Authorization: Bearer {{token}}
+
+###
+# Renew Flow (auto-issued on approval)
+# 1. Create a listing (pending)
+# 2. Approve listing as ADMIN (see approve endpoint above)
+# 3. List renew tokens as the listing owner to obtain the auto-issued token
+# 4. Redeem the token to extend expiry
+# Notes:
+#  - Manual issue & delete endpoints were removed.
+#  - Tokens are upserted per approved listing (one active token per listing).
+#  - Update / Patch endpoints are ADMIN utilities (e.g., force-expire, mark used).
+
+### 3. Renew - list my tokens (authenticated user)
+GET {{host}}/renew/tokens
+Authorization: Bearer {{token}}
+
+### (Optional) Renew - list tokens (admin overview)
+GET {{host}}/renew/tokens
+Authorization: Bearer {{adminToken}}
+
+### (Optional) Renew - get token by id (admin)
+GET {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+
+### (Optional) Renew - update token (admin)
+PUT {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "used": true
+}
+
+### (Optional) Renew - patch token (admin)
+PATCH {{host}}/renew/tokens/{{renewTokenId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "expiresAt": "2025-12-31T00:00:00.000Z"
+}
+
+### 4. Renew - redeem token (authenticated user)
+POST {{host}}/renew/redeem
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "listingId": "{{listingId}}"
-}
-
-###
-# Renew - redeem token
-POST {{host}}/renew/redeem
-Content-Type: application/json
-
-{
-  "token": "PASTE_TOKEN_HERE",
-  "redeemedBy": "{{token}}",
+  "token": "PASTE_TOKEN_VALUE_FROM_LIST_STEP",
   "clientIp": "127.0.0.1"
 }
 
@@ -408,40 +448,7 @@ Content-Type: application/json
 
 ### Forwarding routes removed
 
-###
-# Renew - list tokens
-GET {{host}}/renew/tokens
-Authorization: Bearer {{adminToken}}
-
-###
-# Renew - get token by id
-GET {{host}}/renew/tokens/{{renewTokenId}}
-Authorization: Bearer {{adminToken}}
-
-###
-# Renew - update token
-PUT {{host}}/renew/tokens/{{renewTokenId}}
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "used": true
-}
-
-###
-# Renew - patch token
-PATCH {{host}}/renew/tokens/{{renewTokenId}}
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "expiresAt": "2025-12-31T00:00:00.000Z"
-}
-
-###
-# Renew - delete token
-DELETE {{host}}/renew/tokens/{{renewTokenId}}
-Authorization: Bearer {{adminToken}}
+### (Deprecated) Any manual issue/delete endpoints have been removed and are intentionally absent.
 
 ###
 # Categories - list
@@ -485,7 +492,7 @@ Content-Type: application/json
 
 ###
 # Representatives - list by region (optional query param)
-GET {{host}}/representatives?region=Kabul
+GET {{host}}/representatives
 
 ###
 # Representatives - get by id

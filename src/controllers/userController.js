@@ -34,16 +34,35 @@ export const userController = {
       if (!userId) return res.apiError('Unauthorized', 401);
   const { error, value } = updateUserSchema.validate(req.body);
       if (error) return res.apiError(error.message, 400);
-      const { firstName, lastName, contacts, address } = value;
+      const { firstName, lastName, contacts, address, metadata } = value;
       const data = {};
       if (firstName !== undefined) data.firstName = firstName;
       if (lastName !== undefined) data.lastName = lastName;
       if (contacts !== undefined) data.contacts = contacts;
       if (address !== undefined) data.address = address;
+      if (metadata !== undefined) data.metadata = metadata;
+
       if (firstName || lastName) data.fullName = `${firstName || ''}${firstName && lastName ? ' ' : ''}${lastName || ''}`.trim();
-  await prisma.user.update({ where: { id: userId }, data });
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
-  res.apiSuccess(user, 'Updated', 200);
+      try {
+        await prisma.user.update({ where: { id: userId }, data });
+      } catch (err) {
+        // Graceful fallback for environments where Prisma client hasn't been regenerated yet
+        if (err && err.message && err.message.includes('Unknown argument `metadata`')) {
+          delete data.metadata;
+          await prisma.user.update({ where: { id: userId }, data });
+        } else {
+          throw err;
+        }
+      }
+      let user;
+      try {
+        user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+      } catch (err) {
+        if (err && err.message && err.message.includes('Unknown field `metadata`')) {
+          user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+        } else throw err;
+      }
+      res.apiSuccess(user, 'Updated', 200);
     } catch (e) {
       logger.error(e, 'Failed to update profile');
       res.apiError('Update failed', 500);
@@ -54,7 +73,7 @@ export const userController = {
 userController.get = async function (req, res) {
   try {
     const id = req.params.id;
-    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
     if (!user) return res.apiError('Not found', 404);
     res.apiSuccess(user, 'OK', 200);
   } catch (e) {
@@ -68,8 +87,25 @@ userController.updateById = async function (req, res) {
     const id = req.params.id;
     const { error, value } = updateUserSchema.validate(req.body);
     if (error) return res.apiError(error.message, 400);
-    await prisma.user.update({ where: { id }, data: value });
-    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    try {
+      await prisma.user.update({ where: { id }, data: value });
+    } catch (err) {
+      if (err && err.message && err.message.includes('Unknown argument `metadata`')) {
+        const fallback = { ...value };
+        delete fallback.metadata;
+        await prisma.user.update({ where: { id }, data: fallback });
+      } else {
+        throw err;
+      }
+    }
+    let user;
+    try {
+      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+    } catch (err) {
+      if (err && err.message && err.message.includes('Unknown field `metadata`')) {
+        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+      } else throw err;
+    }
     res.apiSuccess(user, 'Updated', 200);
   } catch (e) {
     logger.error(e, 'Failed to update user by id');
@@ -83,8 +119,24 @@ userController.patchById = async function (req, res) {
     const payload = req.body;
     const data = {};
     for (const k of Object.keys(payload)) data[k] = payload[k];
-    await prisma.user.update({ where: { id }, data });
-    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    try {
+      await prisma.user.update({ where: { id }, data });
+    } catch (err) {
+      if (err && err.message && err.message.includes('Unknown argument `metadata`')) {
+        delete data.metadata;
+        await prisma.user.update({ where: { id }, data });
+      } else {
+        throw err;
+      }
+    }
+    let user;
+    try {
+      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+    } catch (err) {
+      if (err && err.message && err.message.includes('Unknown field `metadata`')) {
+        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+      } else throw err;
+    }
     res.apiSuccess(user, 'Patched', 200);
   } catch (e) {
     logger.error(e, 'Failed to patch user by id');

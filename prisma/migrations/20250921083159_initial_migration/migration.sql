@@ -11,6 +11,7 @@ CREATE TABLE `User` (
     `fullName` VARCHAR(191) NULL,
     `contacts` JSON NULL,
     `address` JSON NULL,
+    `metadata` JSON NULL,
     `passwordHash` VARCHAR(191) NOT NULL,
 
     UNIQUE INDEX `User_email_key`(`email`),
@@ -136,7 +137,7 @@ CREATE TABLE `ListingRenewToken` (
     `token` VARCHAR(191) NOT NULL,
     `issuedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `expiresAt` DATETIME(3) NOT NULL,
-    `used` BOOLEAN NOT NULL DEFAULT false,
+    `used` INTEGER NULL DEFAULT 0,
 
     UNIQUE INDEX `ListingRenewToken_listingId_key`(`listingId`),
     UNIQUE INDEX `ListingRenewToken_token_key`(`token`),

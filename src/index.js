@@ -18,8 +18,7 @@ import { scheduleRecurringJobs } from './schedulers/cron.js';
 import './workers/searchWorker.js';
 import './workers/moderationWorker.js';
 import './workers/notificationWorker.js';
-import './workers/statusCleanupWorker.js';
-import './workers/feedbackWorker.js';
+import './workers/renewalReminderWorker.js';
 
 const app = express();
 import http from 'http';

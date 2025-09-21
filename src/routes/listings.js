@@ -21,8 +21,8 @@ router.post('/', requireAuth, upload.any(), listingController.create);
 router.get('/:id', listingController.get);
 
 // Full update and partial update (authenticated users)
-router.put('/:id', requireAuth, listingController.update);
-router.patch('/:id', requireAuth, listingController.patch);
+router.put('/:id', requireAuth, upload.any(), listingController.update);
+router.patch('/:id', requireAuth, upload.any(), listingController.patch);
 
 // Update contact visibility and bind representatives by location when hiding seller
 router.post('/:id', requireAuth, listingController.updateVisibilityAndBindReps);

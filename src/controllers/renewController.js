@@ -1,13 +1,7 @@
 import { renewService } from '../services/renewService.js';
-import { issueRenewSchema, redeemRenewSchema } from '../validation/renew.js';
+import { redeemRenewSchema } from '../validation/renew.js';
 
 export const renewController = {
-  async issue(req, res) {
-  const { error, value } = issueRenewSchema.validate(req.body);
-  if (error) return res.apiError(error.message, 400);
-  const token = await renewService.issueToken(value.listingId);
-  res.apiSuccess({ token }, 'Issued', 200);
-  },
   async redeem(req, res) {
   const { error, value } = redeemRenewSchema.validate(req.body);
     if (error) return res.apiError(error.message, 400);
@@ -67,11 +61,4 @@ renewController.patchToken = async function (req, res) {
   } catch (e) { res.apiError('Failed', 500); }
 };
 
-renewController.deleteToken = async function (req, res) {
-  try {
-    const id = Number(req.params.id);
-    const { prisma } = await import('../config/prisma.js');
-    await prisma.listingRenewToken.delete({ where: { id } });
-    res.apiSuccess(null, 'Deleted', 200);
-  } catch (e) { res.apiError('Failed', 500); }
-};
+// delete token route removed per policy

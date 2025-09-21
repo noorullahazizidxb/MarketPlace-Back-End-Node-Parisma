@@ -274,15 +274,87 @@ export const listingController = {
   async update(req, res) {
     try {
       const id = req.params.id;
-      const payload = req.body;
+      const payload = { ...req.body };
+      // Parse JSON string fields
+      for (const k of ['metadata','removeImages','images']) {
+        if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) {} }
+      }
+      // Coerce numeric fields
+      if (typeof payload.price === 'string' && !isNaN(Number(payload.price))) payload.price = Number(payload.price);
+      if (typeof payload.categoryId === 'string' && !isNaN(Number(payload.categoryId))) payload.categoryId = Number(payload.categoryId);
+      // Integrate uploaded files into images list
+      if (Array.isArray(req.files) && req.files.length) {
+        const uploadsDir = `uploads/listings/${id}`;
+        payload.images = Array.isArray(payload.images) ? payload.images : [];
+        let base = payload.images.length;
+        for (const f of req.files) {
+          try {
+            const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || f.fieldname || 'image');
+            const url = `/${dest.replace(/\\/g,'/').replace(/^\/?/, '')}`;
+            payload.images.push({ url, position: base++ });
+          } catch (e) {}
+        }
+      }
       const data = { ...payload };
       // prevent changing immutable fields
       delete data.id;
       delete data.createdAt;
       delete data.userId;
-      const updated = await prisma.listing.update({ where: { id }, data });
-      const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
-      return res.apiSuccess(full, 'Updated', 200);
+      // If images provided in payload, replace existing images
+      if (Array.isArray(payload.images)) {
+        try {
+          const prevImages = await prisma.listingImage.findMany({ where: { listingId: id } });
+          for (const pi of prevImages) {
+            try { await storage.deletePath(pi.url); } catch (e) {}
+            try { await prisma.listingImage.delete({ where: { id: pi.id } }); } catch (e) {}
+          }
+          // Insert new images
+          const imgs = payload.images.map((item, idx) => {
+            if (typeof item === 'string') return { listingId: id, url: item, position: idx };
+            return { listingId: id, url: item.url, alt: item.alt || null, position: item.position !== undefined ? item.position : idx };
+          });
+          if (imgs.length) await prisma.listingImage.createMany({ data: imgs });
+        } catch (e) {
+          // Continue; don't fail the whole update for image cleanup issues
+        }
+        // remove images from data payload to avoid prisma trying to write nested relations
+        delete data.images;
+      }
+      // Optional explicit removals independent of full replacement
+      if (Array.isArray(payload.removeImages) && payload.removeImages.length && !Array.isArray(payload.images)) {
+        for (const raw of payload.removeImages) {
+          const imgId = Number(raw);
+          if (!isNaN(imgId)) {
+            try { const img = await prisma.listingImage.findUnique({ where: { id: imgId } }); if (img && img.listingId === id) { try { await storage.deletePath(img.url); } catch (e) {} await prisma.listingImage.delete({ where: { id: imgId } }); } } catch (e) {}
+          }
+        }
+      }
+      // Mark as PENDING and perform update
+      try {
+        const existing = await prisma.listing.findUnique({ where: { id }, select: { userId: true, title: true } });
+        data.status = 'PENDING';
+        const updated = await prisma.listing.update({ where: { id }, data });
+        // Notify owner that listing was updated and moved to pending
+        try {
+          await prisma.notification.create({
+            data: {
+              title: 'Your listing was updated',
+              message: `Your listing "${existing?.title || 'listing'}" was updated and moved to PENDING for review by an admin.`,
+              channel: 'SYSTEM',
+              targetType: 'USER',
+              listingId: id,
+              triggerEvent: 'LISTING_UPDATED_PENDING',
+              recipients: { create: [{ userId: existing?.userId || null }] }
+            }
+          });
+          try { const { emitToUser } = await import('../websocket/socket.js'); emitToUser(existing?.userId, 'notification:new', { type: 'LISTING_UPDATED_PENDING', listingId: id }); } catch (e) {}
+        } catch (e) { logger.warn(e, 'Failed to create update notification for listing'); }
+        const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+        return res.apiSuccess(full, 'Updated', 200);
+      } catch (e) {
+        logger.error(e, 'Failed to update listing');
+        return res.apiError('Update failed', 500);
+      }
     } catch (e) {
       logger.error(e, 'Failed to update listing');
       return res.apiError('Update failed', 500);
@@ -292,18 +364,112 @@ export const listingController = {
   async patch(req, res) {
     try {
       const id = req.params.id;
-      const payload = req.body;
+      const payload = { ...req.body };
+      // Parse JSON string fields
+      for (const k of ['metadata','removeImages','images']) {
+        if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) {} }
+      }
+      // Coerce numeric fields
+      if (typeof payload.price === 'string' && !isNaN(Number(payload.price))) payload.price = Number(payload.price);
+      if (typeof payload.categoryId === 'string' && !isNaN(Number(payload.categoryId))) payload.categoryId = Number(payload.categoryId);
+      // Integrate uploaded files into images list
+      if (Array.isArray(req.files) && req.files.length) {
+        const uploadsDir = `uploads/listings/${id}`;
+        // We'll store uploaded files separately; do not force creation of payload.images (which implies full replacement)
+        payload.__uploadedFiles = [];
+        let base = 0;
+        for (const f of req.files) {
+          try {
+            const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || f.fieldname || 'image');
+            const url = `/${dest.replace(/\\/g,'/').replace(/^\/?/, '')}`;
+            payload.__uploadedFiles.push({ url, position: base++ });
+          } catch (e) {
+            logger.warn(e, 'Failed to persist uploaded patch image');
+          }
+        }
+      }
+
       const data = {};
-      // copy only provided fields
       for (const k of Object.keys(payload)) {
-        if (['id','createdAt','userId'].includes(k)) continue;
+        if (['id','createdAt','userId','images','removeImages','__uploadedFiles'].includes(k)) continue;
         data[k] = payload[k];
       }
-      const updated = await prisma.listing.update({ where: { id }, data });
-      const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
-      return res.apiSuccess(full, 'Patched', 200);
+
+      // Determine image operation mode
+      const explicitReplace = Array.isArray(payload.images); // user explicitly sent an images array field
+      const hasRemovals = Array.isArray(payload.removeImages) && payload.removeImages.length;
+      const hasUploads = Array.isArray(payload.__uploadedFiles) && payload.__uploadedFiles.length;
+
+      try {
+        if (explicitReplace) {
+          // Full replacement mode
+            const prevImages = await prisma.listingImage.findMany({ where: { listingId: id } });
+            for (const pi of prevImages) {
+              try { await storage.deletePath(pi.url); } catch (e) {}
+              try { await prisma.listingImage.delete({ where: { id: pi.id } }); } catch (e) {}
+            }
+            const imgs = payload.images.map((item, idx) => {
+              if (typeof item === 'string') return { listingId: id, url: item, position: idx };
+              return { listingId: id, url: item.url, alt: item.alt || null, position: item.position !== undefined ? item.position : idx };
+            });
+            if (imgs.length) await prisma.listingImage.createMany({ data: imgs });
+        } else {
+          // Additive mode (removals + new uploads only)
+          if (hasRemovals) {
+            for (const raw of payload.removeImages) {
+              const imgId = Number(raw);
+              if (!isNaN(imgId)) {
+                try {
+                  const img = await prisma.listingImage.findUnique({ where: { id: imgId } });
+                  if (img && img.listingId === id) {
+                    try { await storage.deletePath(img.url); } catch (e) {}
+                    await prisma.listingImage.delete({ where: { id: imgId } });
+                  }
+                } catch (e) {
+                  logger.warn(e, 'Failed to remove image in patch');
+                }
+              }
+            }
+          }
+          if (hasUploads) {
+            // Determine next position (append to end)
+            const currentCount = await prisma.listingImage.count({ where: { listingId: id } });
+            let pos = currentCount;
+            const newImgs = payload.__uploadedFiles.map(item => ({ listingId: id, url: item.url, position: pos++ }));
+            if (newImgs.length) await prisma.listingImage.createMany({ data: newImgs });
+          }
+        }
+      } catch (imgOpErr) {
+        logger.error(imgOpErr, 'Image operations failed during patch');
+      }
+
+      // Mark as PENDING and perform patch update
+      try {
+        const existing = await prisma.listing.findUnique({ where: { id }, select: { userId: true, title: true } });
+        data.status = 'PENDING';
+        const updated = await prisma.listing.update({ where: { id }, data });
+        try {
+          await prisma.notification.create({
+            data: {
+              title: 'Your listing was updated',
+              message: `Your listing "${existing?.title || 'listing'}" was updated and moved to PENDING for review by an admin.`,
+              channel: 'SYSTEM',
+              targetType: 'USER',
+              listingId: id,
+              triggerEvent: 'LISTING_UPDATED_PENDING',
+              recipients: { create: [{ userId: existing?.userId || null }] }
+            }
+          });
+          try { const { emitToUser } = await import('../websocket/socket.js'); emitToUser(existing?.userId, 'notification:new', { type: 'LISTING_UPDATED_PENDING', listingId: id }); } catch (e) {}
+        } catch (e) { logger.warn(e, 'Failed to create update notification for listing'); }
+        const full = await prisma.listing.findUnique({ where: { id }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+        return res.apiSuccess(full, 'Patched', 200);
+      } catch (e) {
+        logger.error({ error: e, data, payloadMeta: { explicitReplace, hasRemovals, hasUploads } }, 'Failed to patch listing');
+        return res.apiError('Patch failed', 500);
+      }
     } catch (e) {
-      logger.error(e, 'Failed to patch listing');
+      logger.error({ error: e }, 'Failed to patch listing (outer)');
       return res.apiError('Patch failed', 500);
     }
   }

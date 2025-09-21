@@ -4,12 +4,17 @@ import { nanoid } from 'nanoid';
 export const renewRepository = {
   async createToken(listingId, expiresAt) {
     const token = nanoid();
-    return prisma.listingRenewToken.create({ data: { listing: { connect: { id: listingId } }, token, expiresAt } });
+    try {
+      return await prisma.listingRenewToken.create({ data: { listing: { connect: { id: listingId } }, token, expiresAt, renewCount: 0 } });
+    } catch (err) {
+      // Fallback for environments where Prisma schema/client wasn't regenerated and renewCount is unknown
+      if (err && err.message && err.message.includes('Unknown argument `renewCount`')) {
+        return prisma.listingRenewToken.create({ data: { listing: { connect: { id: listingId } }, token, expiresAt } });
+      }
+      throw err;
+    }
   },
   async findByToken(token) {
     return prisma.listingRenewToken.findUnique({ where: { token } });
-  },
-  async markUsed(id) {
-    return prisma.listingRenewToken.update({ where: { id }, data: { used: true } });
   }
 };
