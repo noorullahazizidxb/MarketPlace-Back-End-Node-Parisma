@@ -9,7 +9,8 @@ export const config = {
   node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
     username: process.env.ELASTICSEARCH_USERNAME,
     password: process.env.ELASTICSEARCH_PASSWORD,
-    index: process.env.ELASTICSEARCH_INDEX || 'listings'
+    index: process.env.ELASTICSEARCH_INDEX || 'listings',
+    usersIndex: process.env.ELASTICSEARCH_USERS_INDEX || 'users'
   , allowSelfSigned: process.env.ELASTICSEARCH_ALLOW_SELF_SIGNED === 'true'
   },
   tokens: {

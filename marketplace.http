@@ -2,7 +2,7 @@
 
 @host = http://localhost:4000/api
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
-@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnV5aG8wMDAwdHU4OGgxMmg2OGx3Iiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU3NDk5NDk1LCJleHAiOjE3NTgxMDQyOTV9.9VqT6xQwqLs_L6Q4NbRWEVSlE6qElcIBm0juYkqzWOE
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZ0Z3kyNzIwMDAwdHVjNGFnZjV2NHhxIiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU4NTM5MDQ3LCJleHAiOjE3NTkxNDM4NDd9.VbW0j3NYZozOgv2Y-XrupgRFmJA6COs-LGgjO5BQ4Uc
 @listingId = cmfdwnrdo0000tur0iubjermu
 @userId = USER_ID
 @notificationId = NOTIFICATION_ID
@@ -222,6 +222,11 @@ GET {{host}}/listings/cmff5cbxv0041tu5c1vf24px8
 GET {{host}}/listings
 
 ###
+# Listings - list approved with hidden seller contact (public)
+GET {{host}}/listings/hidden
+
+
+###
 # Listings - list pending (requires authentication)
 GET {{host}}/listings/pending
 Authorization: Bearer {{token}}
@@ -396,6 +401,11 @@ GET {{host}}/users
 Authorization: Bearer {{adminToken}}
 
 ###
+# Users - search users (uses Elasticsearch when `q` provided)
+GET {{host}}/users?q=us&autocomplete=true
+Authorization: Bearer {{adminToken}}
+
+###
 # Users - get by id
 GET {{host}}/users/{{userId}}
 Authorization: Bearer {{adminToken}}
@@ -431,6 +441,7 @@ Content-Type: application/json
 ###
 # Notifications - list (public)
 GET {{host}}/notifications
+
 
 ###
 # Notifications - get by id (public)

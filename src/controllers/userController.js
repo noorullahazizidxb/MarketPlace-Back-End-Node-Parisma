@@ -3,6 +3,7 @@ import path from 'path';
 import { logger } from '../utils/logger.js';
 import { storage } from '../utils/storage.js';
 import { updateUserSchema } from '../validation/user.js';
+import { searchUsers, suggestUsers } from '../search/elasticsearch.js';
 
 
 export const userController = {
@@ -149,6 +150,31 @@ userController.list = async function (req, res) {
   try {
     const page = parseInt(req.query.page || '1', 10);
     const perPage = parseInt(req.query.perPage || '50', 10);
+    const q = (req.query.q || '').trim();
+    if (q) {
+      const wantAutocomplete = (req.query.autocomplete === 'true' || req.query.autocomplete === '1');
+      if (wantAutocomplete) {
+        try {
+          const sugg = await suggestUsers(q, { size: perPage });
+          // Also fetch full search hits (light) to accompany suggestions
+          let hits = [];
+          try {
+            const sr = await searchUsers(q, { page, perPage });
+            hits = sr.results;
+          } catch (e) {}
+          return res.apiSuccess({ autocomplete: sugg, hits }, 'OK', 200);
+        } catch (e) {
+          console.warn('Autocomplete failed, fallback to normal search', e.message || e);
+        }
+      }
+      try {
+        const s = await searchUsers(q, { page, perPage });
+        return res.apiSuccess({ total: s.total, items: s.results }, 'OK', 200);
+      } catch (e) {
+        // fallback to DB if search fails
+        console.warn('User search failed, falling back to DB', e.message || e);
+      }
+    }
     const users = await prisma.user.findMany({ skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } });
     return res.apiSuccess(users, 'OK', 200);
   } catch (e) {

@@ -8,6 +8,8 @@ const router = express.Router();
 const upload = multer({ dest: 'tmp/uploads' });
 // List approved listings (public)
 router.get('/', listingController.listApproved);
+// List approved listings with hidden seller contact
+router.get('/hidden', listingController.listHiddenContact);
 // List pending/unapproved listings (admin)
 router.get('/pending', requireAuth, listingController.listPending);
 // Real-time approvals: broadcast pending listings to admin clients

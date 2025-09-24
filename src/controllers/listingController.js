@@ -72,6 +72,23 @@ export const listingController = {
     }
   },
 
+  async listHiddenContact(req, res) {
+    try {
+      // Return approved listings whose contactVisibility indicates seller details are hidden
+      const listings = await prisma.listing.findMany({ where: { status: 'APPROVED', contactVisibility: 'HIDE_SELLER' }, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } }, notifications: true, feedbacks: { include: { user: { select: { id: true, fullName: true, firstName: true, lastName: true, photo: true } } } } } });
+      const withStats = listings.map(l => {
+        const ratings = Array.isArray(l.feedbacks) ? l.feedbacks.map(f => typeof f.rating === 'number' ? f.rating : null).filter(v => v !== null) : [];
+        const count = ratings.length;
+        const avg = count ? (ratings.reduce((a,b)=>a+b,0) / count) : 0;
+        return { ...l, reviewCount: l.feedbacks?.length || 0, averageRating: avg };
+      });
+      return res.apiSuccess(withStats, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to list hidden-contact listings');
+      return res.apiError('Failed to list', 500);
+    }
+  },
+
   async listPending(req, res) {
     try {
       const page = parseInt(req.query.page || '1', 10);
