@@ -58,6 +58,15 @@ enum NotificationChannel {
   PUSH
 }
 
+enum AdPlacement {
+  HOME_PAGE_1ST
+  HOME_PAGE_2ND
+  HOME_PAGE_3RD
+  DETAIL_PAGE_1ST
+  DETAIL_PAGE_2ND
+  DETAIL_PAGE_SIDEBAR
+}
+
 // --------------------------------------------------
 // Models
 // --------------------------------------------------
@@ -310,5 +319,20 @@ model Themes {
   isActive  Boolean  @default(true)
 
   @@index([createdAt])
+}
+
+// Ads model: store promotional content with placement enum and an online image URL
+model Ad {
+  id         Int         @id @default(autoincrement())
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  title      String
+  body       String?
+  imageUrl   String?     // URL to the ad image hosted online
+  placement  AdPlacement
+  isActive   Boolean     @default(true)
+
+  @@index([placement])
+  @@index([isActive])
 }
 

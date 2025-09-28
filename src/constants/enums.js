@@ -11,3 +11,4 @@ export const ListingStatus = Object.freeze({
   HIDDEN: 'HIDDEN'
 });
 export const ContactVisibility = Object.freeze({ HIDE_SELLER: 'HIDE_SELLER', SHOW_SELLER: 'SHOW_SELLER' });
+export const AdPlacement = Object.freeze({ HOME_PAGE_1ST: 'HOME_PAGE_1ST', HOME_PAGE_2ND: 'HOME_PAGE_2ND', HOME_PAGE_3RD: 'HOME_PAGE_3RD', DETAIL_PAGE_1ST: 'DETAIL_PAGE_1ST', DETAIL_PAGE_2ND: 'DETAIL_PAGE_2ND', DETAIL_PAGE_SIDEBAR: 'DETAIL_PAGE_SIDEBAR' });

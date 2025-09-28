@@ -12,6 +12,7 @@ import userRouter from './users.js';
 import themesRouter from './themes.js';
 import notificationsRouter from './notifications.js';
 import listingFeedbacksRouter from './listingFeedbacks.js';
+import adsRouter from './ads.js';
 
 export function registerRoutes(app, upload) {
   const api = express.Router();
@@ -34,6 +35,7 @@ export function registerRoutes(app, upload) {
   api.use('/users', (req, res, next) => { res.locals.entityName = 'User'; next(); }, userRouter);
   api.use('/themes', (req, res, next) => { res.locals.entityName = 'Themes'; next(); }, themesRouter);
   api.use('/feedbacks', (req, res, next) => { res.locals.entityName = 'ListingFeedback'; next(); }, listingFeedbacksRouter);
+  api.use('/ads', (req, res, next) => { res.locals.entityName = 'Ad'; next(); }, adsRouter);
 
   app.use('/api', api);
 }

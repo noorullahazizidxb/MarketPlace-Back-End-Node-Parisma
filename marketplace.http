@@ -398,6 +398,65 @@ Authorization: Bearer {{adminToken}}
 ###
 # Users - list all users
 GET {{host}}/users
+
+@adId = 9
+
+###
+# Ads - list (public)
+GET {{host}}/ads
+
+###
+# Ads - get by id (public)
+GET {{host}}/ads/{{adId}}
+
+###
+# Ads - create (admin)
+# NOTE: creation requires ADMIN role (use {{adminToken}})
+POST {{host}}/ads
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Homepage Top Banner - Big Sale",
+  "body": "Huge discounts this weekend. Click to learn more.",
+  "imageUrl": "https://example.com/ads/banner-sale.jpg",
+  "placement": "HOME_PAGE_1ST",
+  "isActive": true
+}
+
+###
+# Ads - update (admin)
+PUT {{host}}/ads/{{adId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Homepage Top Banner - Updated",
+  "body": "Extended sale — new dates.",
+  "imageUrl": "https://example.com/ads/banner-sale-v2.jpg",
+  "placement": "HOME_PAGE_1ST",
+  "isActive": true
+}
+
+###
+# Ads - partial update (admin)
+PATCH {{host}}/ads/{{adId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+###
+# Ads - delete (admin)
+DELETE {{host}}/ads/{{adId}}
+Authorization: Bearer {{adminToken}}
+
+###
+# Placement values allowed:
+# HOME_PAGE_1ST, HOME_PAGE_2ND, HOME_PAGE_3RD,
+# DETAIL_PAGE_1ST, DETAIL_PAGE_2ND, DETAIL_PAGE_SIDEBAR
 Authorization: Bearer {{adminToken}}
 
 ###

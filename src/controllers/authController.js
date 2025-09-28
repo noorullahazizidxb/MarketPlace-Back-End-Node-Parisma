@@ -1,6 +1,7 @@
 import { userService } from '../services/userService.js';
 import { storage } from '../utils/storage.js';
 import { Roles } from '../constants/enums.js';
+import { createNotification } from '../notifications/dispatcher.js';
 import { registerSchema, loginSchema } from '../validation/auth.js';
 
 export const authController = {
@@ -30,9 +31,24 @@ export const authController = {
   const { error, value } = registerSchema.validate(payload);
   if (error) return res.apiError(error.message, 400);
   try {
-    const user = await userService.register(value, Roles.USER);
+    // if payload did not include role, default to USER
+    const roleToUse = payload.role !== undefined && payload.role !== null ? payload.role : Roles.USER;
+    const user = await userService.register(value, roleToUse);
     const token = userService.generateToken(user);
     const full = await userService.getFullUser(user.id);
+    // send welcome notification (fire-and-forget)
+    try {
+      await createNotification({
+        title: 'Welcome to the Marketplace',
+        message: `Welcome ${full.fullName || full.email || 'user'} — your account has been created successfully.`,
+        channel: 'SYSTEM',
+        targetType: 'USER',
+        senderId: null,
+        recipientUserIds: [full.id]
+      });
+    } catch (e) {
+      // don't block registration on notification failures
+    }
     return res.apiSuccess({ user: full, token }, 'Created', 201);
   } catch (err) {
     // Prisma unique constraint error

@@ -242,6 +242,22 @@ CREATE TABLE `Themes` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `Ad` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `title` VARCHAR(191) NOT NULL,
+    `body` VARCHAR(191) NULL,
+    `imageUrl` VARCHAR(191) NULL,
+    `placement` ENUM('HOME_PAGE_1ST', 'HOME_PAGE_2ND', 'HOME_PAGE_3RD', 'DETAIL_PAGE_1ST', 'DETAIL_PAGE_2ND', 'DETAIL_PAGE_SIDEBAR') NOT NULL,
+    `isActive` BOOLEAN NOT NULL DEFAULT true,
+
+    INDEX `Ad_placement_idx`(`placement`),
+    INDEX `Ad_isActive_idx`(`isActive`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `UserRole` ADD CONSTRAINT `UserRole_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 

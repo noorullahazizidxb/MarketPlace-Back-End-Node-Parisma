@@ -43,6 +43,7 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.jobRecord.deleteMany();
+  try { await prisma.ad.deleteMany(); } catch (e) {}
 
   // Create Users
   const users = [];
@@ -165,137 +166,45 @@ async function main() {
     await prisma.jobRecord.create({ data: { queue: 'seed', jobId: `job-${i}-${Date.now()}`, name: 'seed-job', payload: { i } } });
   }
 
+  // Ads (one or more per placement)
+  try {
+    const placements = [
+      'HOME_PAGE_1ST','HOME_PAGE_2ND','HOME_PAGE_3RD',
+      'DETAIL_PAGE_1ST','DETAIL_PAGE_2ND','DETAIL_PAGE_SIDEBAR'
+    ];
+    const sampleImages = [
+      'https://picsum.photos/seed/ad1/728/90',
+      'https://picsum.photos/seed/ad2/300/250',
+      'https://picsum.photos/seed/ad3/600/160',
+      'https://picsum.photos/seed/ad4/320/100',
+      'https://picsum.photos/seed/ad5/468/60',
+      'https://picsum.photos/seed/ad6/200/200'
+    ];
+    for (const p of placements) {
+      const count = randInt(1,2); // 1-2 ads per placement
+      for (let i = 0; i < count; i++) {
+        await prisma.ad.create({ data: {
+          title: `${p.replace(/_/g,' ')} Ad ${i+1}`,
+          body: randText(12),
+          imageUrl: rndChoice(sampleImages) + `?v=${randInt(1,9999)}`,
+          placement: p,
+          isActive: true
+        }});
+      }
+    }
+  } catch (e) {
+    console.warn('Skipping ads seed:', e.message);
+  }
+
   // Default Themes (store light + dark tokens)
   try {
-    const defaultTokens = {
-      id: 'next-like-001',
-      name: 'Next-like Default',
-      notes: 'Store as-is in a MySQL JSON column. When applying at runtime, map token css strings into CSS variables (e.g., set --background: hsl(...)). Scales provide sizes and design tokens for UI components.',
-      scales: {
-        font: {
-          sizes: {
-            lg: '18px',
-            md: '16px',
-            sm: '14px',
-            xl: '20px',
-            xs: '12px',
-            '2xl': '24px',
-            '3xl': '30px'
-          },
-          family: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
-          weights: {
-            bold: 700,
-            medium: 500,
-            regular: 400,
-            semibold: 600,
-            extrabold: 800
-          },
-          lineHeights: {
-            tight: 1.1,
-            normal: 1.4,
-            relaxed: 1.6
-          }
-        },
-        radii: {
-          lg: '18px',
-          md: '12px',
-          sm: '6px',
-          xl: '24px',
-          round: '9999px'
-        },
-        shadow: {
-          lg: '0 20px 60px rgba(2,6,23,0.18)',
-          md: '0 6px 18px rgba(2,6,23,0.12)',
-          sm: '0 1px 2px rgba(0,0,0,0.04)',
-          none: 'none',
-          glass: '0 8px 30px rgba(2,6,23,0.12), inset 0 -6px 20px rgba(255,255,255,0.02)'
-        },
-        zIndex: {
-          base: 10,
-          modal: 90,
-          overlay: 70,
-          dropdown: 60
-        },
-        spacing: {
-          lg: '24px',
-          md: '16px',
-          sm: '8px',
-          xl: '32px',
-          xs: '4px',
-          xxl: '48px'
-        },
-        borderWidth: {
-          thin: '1px',
-          thick: '2px',
-          regular: '1.5px'
-        },
-        transitions: {
-          fast: '150ms cubic-bezier(.2,.9,.2,1)',
-          slow: '350ms cubic-bezier(.2,.9,.2,1)',
-          normal: '250ms cubic-bezier(.2,.9,.2,1)',
-          spring: {
-            type: 'spring',
-            damping: 30,
-            stiffness: 300
-          }
-        }
-      },
-      tokens: {
-        dark: {
-          card: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
-          input: { css: 'hsl(240 3.8% 23%)', hsl: '240 3.8% 23%' },
-          muted: { css: 'hsl(240 3.7% 15.9%)', hsl: '240 3.7% 15.9%' },
-          accent: { css: 'hsl(260 89% 66%)', hsl: '260 89% 66%' },
-          border: { css: 'hsl(240 3.8% 23%)', hsl: '240 3.8% 23%' },
-          primary: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
-          secondary: { css: 'hsl(240 3.7% 15.9%)', hsl: '240 3.7% 15.9%' },
-          background: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
-          foreground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
-          accentForeground: { css: 'hsl(235 100% 95%)', hsl: '235 100% 95%' },
-          primaryForeground: { css: 'hsl(240 10% 4%)', hsl: '240 10% 4%' },
-          secondaryForeground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' }
-        },
-        light: {
-          card: { css: 'hsl(0 0% 100%)', hsl: '0 0% 100%' },
-          input: { css: 'hsl(240 5.9% 90%)', hsl: '240 5.9% 90%' },
-          muted: { css: 'hsl(240 4.8% 95.9%)', hsl: '240 4.8% 95.9%' },
-          accent: { css: 'hsl(260 89% 66%)', hsl: '260 89% 66%' },
-          border: { css: 'hsl(240 5.9% 90%)', hsl: '240 5.9% 90%' },
-          primary: { css: 'hsl(0 0% 7%)', hsl: '0 0% 7%' },
-          secondary: { css: 'hsl(240 4.8% 95.9%)', hsl: '240 4.8% 95.9%' },
-          background: { css: 'hsl(0 0% 100%)', hsl: '0 0% 100%' },
-          foreground: { css: 'hsl(240 10% 3.9%)', hsl: '240 10% 3.9%' },
-          accentForeground: { css: 'hsl(235 100% 95%)', hsl: '235 100% 95%' },
-          primaryForeground: { css: 'hsl(0 0% 98%)', hsl: '0 0% 98%' },
-          secondaryForeground: { css: 'hsl(240 10% 3.9%)', hsl: '240 10% 3.9%' }
-        }
-      },
-      editable: true,
-      createdAt: '2025-09-13T00:00:00Z',
-      components: {
-        card: {
-          border: { token: 'border', width: 'thin' },
-          radius: 'lg',
-          shadow: 'md',
-          background: { token: 'card' }
-        },
-        button: {
-          primary: {
-            color: { token: 'primaryForeground' },
-            radius: 'md',
-            shadow: 'sm',
-            background: { token: 'primary' },
-            transition: 'fast'
-          }
-        },
-        navbar: {
-          border: { token: 'border', width: 'regular' },
-          shadow: 'none',
-          background: { token: 'background' }
-        }
-      },
-      description: 'Next.js-inspired light + dark theme tokens and scales for dynamic theming.'
-    };
+    const defaultTokens = { 
+    "id": 1,
+    "name": "default",
+    "scales": {"font": {"sizes": {"lg": "16px","md": "14px","sm": "12px","xl": "18px","xs": "10px","2xl": "22px","3xl": "28px","base": "13px"},"family": "\"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial","weights": {"bold": "600","medium": "400","regular": "300","semibold": "500","extrabold": "700"},"lineHeights": {"tight": "1.1","normal": "1.3","relaxed": "1.5"}},"radii": {"lg": "18px","md": "12px","sm": "6px","xl": "24px","round": "9999px"},"shadow": {"lg": "0 20px 60px rgba(2,6,23,0.18)","md": "0 6px 18px rgba(2,6,23,0.12)","sm": "0 1px 2px rgba(0,0,0,0.04)","none": "none","glass": "0 8px 30px rgba(2,6,23,0.12), inset 0 -6px 20px rgba(255,255,255,0.02)"},"zIndex": {"base": 10,"modal": 90,"overlay": 70,"dropdown": 60},"spacing": {"lg": "24px","md": "16px","sm": "8px","xl": "32px","xs": "4px","xxl": "48px"},"borderWidth": {"thin": "1px","thick": "2px","regular": "1.5px"},"transitions": {"fast": "150ms cubic-bezier(.2,.9,.2,1)","slow": "350ms cubic-bezier(.2,.9,.2,1)","normal": "250ms cubic-bezier(.2,.9,.2,1)","spring": {"type": "spring","damping": 30,"stiffness": 300}}},
+    "tokens": {"dark": {"card": {"css": "hsl(240 10% 4%)","hsl": [240,10,4]},"input": {"css": "hsl(240 3.8% 23%)","hsl": [240,4,23]},"muted": {"css": "hsl(240 3.7% 15.9%)","hsl": [240,4,16]},"accent": {"css": "hsl(260 89% 66%)","hsl": [260,89,66]},"border": {"css": "hsl(240 3.8% 23%)","hsl": [240,4,23]},"primary": {"css": "hsl(0 0% 98%)","hsl": [0,0,98]},"secondary": {"css": "hsl(240 3.7% 15.9%)","hsl": [240,4,16]},"background": {"css": "hsl(240 10% 4%)","hsl": [240,10,4]},"foreground": {"css": "hsl(0 0% 98%)","hsl": [0,0,98]},"accentForeground": {"css": "hsl(235 100% 95%)","hsl": [235,100,95]},"primaryForeground": {"css": "hsl(240 10% 4%)","hsl": [240,10,4]},"secondaryForeground": {"css": "hsl(0 0% 98%)","hsl": [0,0,98]}},"light": {"card": {"css": "hsl(0 0% 100%)","hsl": [0,0,100]},"input": {"css": "hsl(240 5.9% 90%)","hsl": [240,6,90]},"muted": {"css": "hsl(240 4.8% 95.9%)","hsl": [240,5,96]},"accent": {"css": "hsl(260 89% 66%)","hsl": [260,89,66]},"border": {"css": "hsl(240 5.9% 90%)","hsl": [240,6,90]},"primary": {"css": "hsl(0 0% 7%)","hsl": [0,0,7]},"secondary": {"css": "hsl(240 4.8% 95.9%)","hsl": [240,5,96]},"background": {"css": "hsl(0 0% 100%)","hsl": [0,0,100]},"foreground": {"css": "hsl(240 10% 3.9%)","hsl": [240,10,4]},"accentForeground": {"css": "hsl(235 100% 95%)","hsl": [235,100,95]},"primaryForeground": {"css": "hsl(0 0% 98%)","hsl": [0,0,98]},"secondaryForeground": {"css": "hsl(240 10% 3.9%)","hsl": [240,10,4]}}},
+    "components": {"card": {"border": {"token": "border","width": "thin"},"radius": "lg","shadow": "sm","background": {"token": "card"}},"link": {"color": {"token": "foreground"},"underline": {"token": "primaryForeground"},"background": {"token": "accent"},"hoverColor": {"token": "primary"},"activeColor": {"token": "primary"},"hoverBackground": {"token": "linkBg"}},"button": {"accent": {"radius": "md","hoverShadow": "md","activeShadow": "lg","hoverBackground": {"token": "accent"},"activeBackground": {"token": "accent"}},"primary": {"color": {"token": "primaryForeground"},"radius": "md","shadow": "sm","background": {"token": "primary"},"transition": "fast","hoverShadow": "md","activeShadow": "lg","hoverBackground": {"token": "accent"},"activeBackground": {"token": "accent"}},"secondary": {"radius": "md","hoverShadow": "md","activeShadow": "lg","hoverBackground": {"token": "accent"},"activeBackground": {"token": "accent"}}},"navbar": {"border": {"token": "border","width": "thick"},"shadow": "sm","background": {"token": "background"}}}
+  };
   await prisma.themes.create({ data: { name: 'default', tokens: defaultTokens, isActive: true } });
   } catch (e) {
     // Non-fatal: if Themes table doesn't exist yet, skip
