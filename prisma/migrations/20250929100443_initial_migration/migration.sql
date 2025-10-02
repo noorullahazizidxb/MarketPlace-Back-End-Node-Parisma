@@ -37,7 +37,6 @@ CREATE TABLE `RepresentativeInfo` (
     `whatsappNumber` VARCHAR(191) NULL,
     `active` BOOLEAN NOT NULL DEFAULT true,
 
-    UNIQUE INDEX `RepresentativeInfo_userId_key`(`userId`),
     INDEX `RepresentativeInfo_region_idx`(`region`),
     INDEX `RepresentativeInfo_whatsappNumber_idx`(`whatsappNumber`),
     PRIMARY KEY (`id`)

@@ -1,17 +1,23 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+console.log('ENV DEBUG:', {
+  node: process.env.ELASTICSEARCH_NODE,
+  username: process.env.ELASTICSEARCH_USERNAME,
+  password: process.env.ELASTICSEARCH_PASSWORD ? '***HIDDEN***' : undefined,
+});
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   elastic: {
-  node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
-    username: process.env.ELASTICSEARCH_USERNAME,
+  node: process.env.ELASTICSEARCH_NODE || 'https://localhost:9200',
+    username: process.env.ELASTICSEARCH_USERNAME || 'elastic',
     password: process.env.ELASTICSEARCH_PASSWORD,
     index: process.env.ELASTICSEARCH_INDEX || 'listings',
-    usersIndex: process.env.ELASTICSEARCH_USERS_INDEX || 'users'
-  , allowSelfSigned: process.env.ELASTICSEARCH_ALLOW_SELF_SIGNED === 'true'
+    usersIndex: process.env.ELASTICSEARCH_USERS_INDEX || 'users',
+    allowSelfSigned: process.env.ELASTICSEARCH_ALLOW_SELF_SIGNED || 'true'
   },
   tokens: {
     secret: process.env.TOKEN_SECRET || 'dev_secret'

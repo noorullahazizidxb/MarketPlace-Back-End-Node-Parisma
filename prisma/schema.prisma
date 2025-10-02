@@ -86,7 +86,7 @@ model User {
   passwordHash      String
   roles             UserRole[]
   listings          Listing[]
-  representative    RepresentativeInfo?
+  representatives   RepresentativeInfo[]
   notifications     NotificationRecipient[]
   sentNotifications Notification[]          @relation("SenderNotifications")
   // Listings this user approved
@@ -110,7 +110,7 @@ model UserRole {
 model RepresentativeInfo {
   id             Int                     @id @default(autoincrement())
   user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId         String                  @unique
+  userId         String
   region         String
   whatsappNumber String?
   active         Boolean                 @default(true)

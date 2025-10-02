@@ -17,8 +17,7 @@ export function getES() {
     // Allow self-signed certs when explicitly enabled in env.
     if (config.elastic.allowSelfSigned) {
       base.tls = { rejectUnauthorized: false };
-      // also allow insecure connections for older clients
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+     
     }
 
     esClient = new Client(base);

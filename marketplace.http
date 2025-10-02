@@ -1,6 +1,6 @@
 ### Marketplace API - Rest Client tests
 
-@host = http://localhost:4000/api
+@host = http://localhost:3002/api
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZkcnRvanAwMDAwdHV3Y2dvMTdoNHRyIiwicm9sZXMiOltdLCJpYXQiOjE3NTc0OTY5NjYsImV4cCI6MTc1ODEwMTc2Nn0.dmE5KlTdGs4kjtw0fHwqb4PmgSv5BAbqXKmCQDzl7xA
 @adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWZ0Z3kyNzIwMDAwdHVjNGFnZjV2NHhxIiwicm9sZXMiOlsiQURNSU4iXSwiaWF0IjoxNzU4NTM5MDQ3LCJleHAiOjE3NTkxNDM4NDd9.VbW0j3NYZozOgv2Y-XrupgRFmJA6COs-LGgjO5BQ4Uc
 @listingId = cmfdwnrdo0000tur0iubjermu
@@ -139,6 +139,24 @@ Content-Disposition: form-data; name="representativeInfo"
 
 
 ###
+# Register as REPRESENTATIVE (JSON payload) - useful for automated testing or clients that send JSON
+POST {{host}}/auth/representative/register
+Content-Type: application/json
+
+{
+  "email": "rep-array@example.com",
+  "password": "password123",
+  "phone": "+93000000004",
+  "firstName": "Rep",
+  "lastName": "Array",
+  "fullName": "Rep Array",
+  "representativeInfo": [
+    { "region": "Kabul", "whatsappNumber": "+93000000004", "active": true },
+    { "region": "Herat", "whatsappNumber": "+93000000005", "active": true }
+  ]
+}
+
+
 # Register as ADMIN (protected - requires ADMIN token) - multipart with photo
 POST {{host}}/auth/admin/register
 Authorization: Bearer {{adminToken}}

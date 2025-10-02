@@ -3,6 +3,8 @@ import { storage } from '../utils/storage.js';
 import { Roles } from '../constants/enums.js';
 import { createNotification } from '../notifications/dispatcher.js';
 import { registerSchema, loginSchema } from '../validation/auth.js';
+import { registerRepresentativeSchema } from '../validation/user.js';
+import { representativeService } from '../services/representativeService.js';
 
 export const authController = {
   // NOTE: generic /auth/register removed - use role-specific endpoints
@@ -70,10 +72,26 @@ export const authController = {
     }
   }
   ['contacts','address','metadata','representativeInfo'].forEach(k => { if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) {} } });
-  const { error, value } = registerSchema.validate(payload);
+  // use representative-specific validation when registering a representative
+  const { error, value } = registerRepresentativeSchema.validate(payload);
   if (error) return res.apiError(error.message, 400);
   try {
     const user = await userService.register(value, Roles.REPRESENTATIVE);
+    // if representativeInfo was provided (object or array), persist all entries (supports multiple regions)
+    try {
+      const repInfo = value.representativeInfo;
+      if (repInfo) {
+        const list = Array.isArray(repInfo) ? repInfo : [repInfo];
+        for (const item of list) {
+          if (item && item.region) {
+            // create representative info linked to this user; don't block registration on failure
+            await representativeService.create({ region: item.region, whatsappNumber: item.whatsappNumber, active: item.active }, user.id);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore representative creation errors for now
+    }
     const token = userService.generateToken(user);
     const full = await userService.getFullUser(user.id);
     return res.apiSuccess({ user: full, token }, 'Created', 201);

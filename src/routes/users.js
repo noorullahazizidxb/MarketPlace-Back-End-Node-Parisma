@@ -1,11 +1,12 @@
 import express from 'express';
 import multer from 'multer';
-import { requireAuth } from '../middleware/auth.js';
+import { attachAuth, requireAuth, requireRole } from '../middleware/auth.js';
+import { Roles } from '../constants/enums.js';
 import { userController } from '../controllers/userController.js';
 
 const router = express.Router();
 const upload = multer({ dest: 'tmp/uploads' });
-router.get('/', userController.list);
+router.get('/', attachAuth, requireAuth, requireRole(Roles.ADMIN), userController.list);
 router.get('/:id', userController.get);
 // Return listings for the current authenticated user
 import { listingController } from '../controllers/listingController.js';

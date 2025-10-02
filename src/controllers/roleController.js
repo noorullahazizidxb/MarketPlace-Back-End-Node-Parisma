@@ -6,12 +6,12 @@ export const roleController = {
   async assign(req, res) {
   const { error, value } = assignRoleSchema.validate(req.body);
   if (error) return res.apiError(error.message, 400);
-  const data = await prisma.userRole.create({ data: { userId: value.userId, role: value.role }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+  const data = await prisma.userRole.create({ data: { userId: value.userId, role: value.role }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representatives: true } } } });
   res.apiSuccess(data, 'Assigned', 201);
   },
   async listUserRoles(req, res) {
     const userId = req.params.userId;
-  const roles = await prisma.userRole.findMany({ where: { userId }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+  const roles = await prisma.userRole.findMany({ where: { userId }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representatives: true } } } });
   res.apiSuccess(roles, 'OK', 200);
   }
 };
@@ -19,7 +19,7 @@ export const roleController = {
 // list all role assignments (admin)
 roleController.listAll = async function (req, res) {
   try {
-    const roles = await prisma.userRole.findMany({ include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+  const roles = await prisma.userRole.findMany({ include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representatives: true } } } });
     return res.apiSuccess(roles, 'OK', 200);
   } catch (e) {
     return res.apiError('Failed to list roles', 500);
@@ -28,7 +28,7 @@ roleController.listAll = async function (req, res) {
 
 roleController.get = async function (req, res) {
   const id = Number(req.params.id);
-  const r = await prisma.userRole.findUnique({ where: { id }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } } } });
+  const r = await prisma.userRole.findUnique({ where: { id }, include: { user: { include: { roles: true, listings: { include: { images: true, category: true } }, representatives: true } } } });
   if (!r) return res.apiError('Not found', 404);
   res.apiSuccess(r, 'OK', 200);
 };

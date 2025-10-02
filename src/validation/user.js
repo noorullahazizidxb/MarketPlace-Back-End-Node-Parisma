@@ -16,6 +16,7 @@ export const addressSchema = Joi.object({
   street: Joi.string().optional(),
   city: Joi.string().optional(),
   country: Joi.string().optional(),
+  region: Joi.string().optional(),
   postalCode: Joi.string().optional(),
   unit: Joi.string().optional()
 }).optional();
@@ -34,4 +35,29 @@ export const createUserSchema = Joi.object({
 
 export const updateUserSchema = createUserSchema.keys({
   email: Joi.string().email().optional()
+});
+
+// Schema for users updating their own profile (allows optional password change)
+export const updateProfileSchema = updateUserSchema.keys({
+  password: Joi.string().min(6).optional(),
+  confirmPassword: Joi.any().valid(Joi.ref('password')).when('password', {
+    is: Joi.string().min(6),
+    then: Joi.required(),
+    otherwise: Joi.forbidden()
+  }).messages({ 'any.only': 'confirmPassword must match password' })
+});
+
+export const representativeInfoItem = Joi.object({
+  region: Joi.string().required(),
+  whatsappNumber: Joi.string().optional(),
+  active: Joi.boolean().optional()
+});
+
+// Registration schema for representatives (can accept representativeInfo as object or array)
+export const registerRepresentativeSchema = createUserSchema.keys({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  confirmPassword: Joi.any().valid(Joi.ref('password')).required().messages({ 'any.only': 'confirmPassword must match password' }),
+  representativeInfo: Joi.alternatives().try(representativeInfoItem, Joi.array().items(representativeInfoItem)).optional(),
+  photo: Joi.string().optional()
 });

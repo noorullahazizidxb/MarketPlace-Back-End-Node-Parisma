@@ -2,7 +2,8 @@ import { prisma } from '../config/prisma.js';
 import path from 'path';
 import { logger } from '../utils/logger.js';
 import { storage } from '../utils/storage.js';
-import { updateUserSchema } from '../validation/user.js';
+import { updateUserSchema, updateProfileSchema } from '../validation/user.js';
+import { hashPassword } from '../utils/password.js';
 import { searchUsers, suggestUsers } from '../search/elasticsearch.js';
 
 
@@ -21,7 +22,7 @@ export const userController = {
   const prev = (await prisma.user.findUnique({ where: { id: userId } })).photo;
   if (prev) await storage.deletePath(prev);
   await prisma.user.update({ where: { id: userId }, data: { photo: url } });
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
   res.apiSuccess({ photo: url, user }, 'Uploaded', 201);
     } catch (e) {
       logger.error(e, 'Failed to upload user photo');
@@ -33,9 +34,9 @@ export const userController = {
     try {
       const userId = req.user?.id;
       if (!userId) return res.apiError('Unauthorized', 401);
-  const { error, value } = updateUserSchema.validate(req.body);
+  const { error, value } = updateProfileSchema.validate(req.body);
       if (error) return res.apiError(error.message, 400);
-      const { firstName, lastName, contacts, address, metadata } = value;
+  const { firstName, lastName, contacts, address, metadata, password } = value;
       const data = {};
       if (firstName !== undefined) data.firstName = firstName;
       if (lastName !== undefined) data.lastName = lastName;
@@ -44,6 +45,15 @@ export const userController = {
       if (metadata !== undefined) data.metadata = metadata;
 
       if (firstName || lastName) data.fullName = `${firstName || ''}${firstName && lastName ? ' ' : ''}${lastName || ''}`.trim();
+      // handle optional password change
+      if (password) {
+        try {
+          data.passwordHash = await hashPassword(password);
+        } catch (e) {
+          logger.error(e, 'Failed to hash password during profile update');
+          return res.apiError('Failed to update password', 500);
+        }
+      }
       try {
         await prisma.user.update({ where: { id: userId }, data });
       } catch (err) {
@@ -57,10 +67,10 @@ export const userController = {
       }
       let user;
       try {
-        user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+  user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } catch (err) {
         if (err && err.message && err.message.includes('Unknown field `metadata`')) {
-          user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+          user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
         } else throw err;
       }
       res.apiSuccess(user, 'Updated', 200);
@@ -74,7 +84,7 @@ export const userController = {
 userController.get = async function (req, res) {
   try {
     const id = req.params.id;
-    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
     if (!user) return res.apiError('Not found', 404);
     res.apiSuccess(user, 'OK', 200);
   } catch (e) {
@@ -101,10 +111,10 @@ userController.updateById = async function (req, res) {
     }
     let user;
     try {
-      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
     } catch (err) {
       if (err && err.message && err.message.includes('Unknown field `metadata`')) {
-        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } else throw err;
     }
     res.apiSuccess(user, 'Updated', 200);
@@ -132,10 +142,10 @@ userController.patchById = async function (req, res) {
     }
     let user;
     try {
-      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representative: true } });
+  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
     } catch (err) {
       if (err && err.message && err.message.includes('Unknown field `metadata`')) {
-        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } else throw err;
     }
     res.apiSuccess(user, 'Patched', 200);
@@ -175,7 +185,20 @@ userController.list = async function (req, res) {
         console.warn('User search failed, falling back to DB', e.message || e);
       }
     }
-    const users = await prisma.user.findMany({ skip: (page - 1) * perPage, take: perPage, orderBy: { createdAt: 'desc' }, include: { roles: true, listings: { include: { images: true, category: true } }, representative: true } });
+    const users = await prisma.user.findMany({
+      skip: (page - 1) * perPage,
+      take: perPage,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        roles: true,
+        listings: { include: { images: true, category: true } },
+  representatives: true,
+        // NotificationRecipient rows for this user, include the notification details
+        notifications: { include: { notification: true } },
+        auditLogs: true,
+        feedbacks: true
+      }
+    });
     return res.apiSuccess(users, 'OK', 200);
   } catch (e) {
     logger.error(e, 'Failed to list users');
