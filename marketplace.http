@@ -156,6 +156,20 @@ Content-Type: application/json
   ]
 }
 
+###
+# Representatives - bind existing user to representative info (admin or self)
+POST {{host}}/representatives/bind
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "representativeInfo": [
+    { "region": "Kabul", "whatsappNumber": "+93000000004", "active": true },
+    { "region": "Herat", "whatsappNumber": "+93000000005", "active": true }
+  ]
+}
+
 
 # Register as ADMIN (protected - requires ADMIN token) - multipart with photo
 POST {{host}}/auth/admin/register
@@ -206,6 +220,29 @@ Content-Disposition: form-data; name="metadata"
 # Admin - stats (shows retention days, scheduled times and queue job counts)
 GET {{host}}/admin/stats
 Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+# Expected response (trimmed) - useful for frontend charting tests (Recharts-friendly shapes)
+# {
+#   "totals": { "total": 1234, "pending": 12, "approved": 1200 },
+#   "retention": { "unapprovedDays": 2, "renewWindowDays": 14 },
+#   "schedules": { "moderationCleanupTime": "03:00", "renewalCleanupTime": "06:00" },
+#   "queueStats": { "moderation-cleanup": { "waiting": 0, "active": 0 }, "search-index": { "available": true } },
+#   "summary": { "totalListings": 1234, "pendingListings": 12, "approvedListings": 1200, "totalUsers": 400, "feedbackCount": 150, "avgRating": 4.2 },
+#   "charts": {
+#     "listingsDaily": [ { "date": "2025-09-03", "created": 10, "approved": 4 }, ... ],
+#     "listingsMonthly": [ { "month": "2025-01", "created": 120 }, ... ],
+#     "usersDaily": [ { "date": "2025-09-03", "registered": 5 }, ... ],
+#     "feedbackDaily": [ { "date": "2025-09-03", "feedbackCount": 3, "avgRating": 4.5 }, ... ],
+#     "notificationsDaily": [ { "date": "2025-09-03", "total": 20, "email": 5, "whatsapp": 10, "system": 5 }, ... ],
+#     "approvalTimeDaily": [ { "date": "2025-09-03", "avgHours": 12 }, ... ],
+#     "representativesByRegion": [ { "region": "Kabul", "count": 12 }, ... ]
+#     ,"listingsTypeStatusDaily": [ { "day": "2025-10-02", "type": "RENT", "PENDING": 3, "APPROVED": 1, "REJECTED": 0, "SOLD": 0, "RENTED": 0, "EXPIRED": 0, "DRAFT": 2, "HIDDEN": 0 }, ...]
+#     ,"listingsTypeStatusWeekly": [ { "week": "2025-W40", "type": "SALE", "PENDING": 10, "APPROVED": 4, ... }, ... ]
+#     ,"listingsTypeStatusMonthly": [ { "month": "2025-10", "type": "RENT", "PENDING": 40, ... }, ... ]
+#     ,"listingsTypeStatusYearly": [ { "year": "2025", "type": "SALE", "PENDING": 400, ... }, ... ]
+#   }
+# }
 
 ###
 # Listings - create (requires Authorization header)

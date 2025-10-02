@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { config } from '../config/index.js';
 import { queues, QUEUES } from '../jobs/queues.js';
+import { reportService } from '../services/reportService.js';
 
 export const adminController = {
   async pendingListings(req, res) {
@@ -19,12 +20,18 @@ export const adminController = {
   res.apiSuccess(full, 'Rejected', 200);
   },
   async stats(req, res) {
-    const total = await prisma.listing.count();
-    const pending = await prisma.listing.count({ where: { status: 'PENDING' } });
-    const approved = await prisma.listing.count({ where: { status: 'APPROVED' } });
-  // retention configuration (days)
-  const retention = config.retention || {};
-  const schedules = config.schedules || {};
+    const [baseTotals, reports] = await Promise.all([
+      (async () => {
+        const total = await prisma.listing.count();
+        const pending = await prisma.listing.count({ where: { status: 'PENDING' } });
+        const approved = await prisma.listing.count({ where: { status: 'APPROVED' } });
+        return { total, pending, approved };
+      })(),
+      reportService.buildAll()
+    ]);
+    // retention configuration (days)
+    const retention = config.retention || {};
+    const schedules = config.schedules || {};
 
     // queue statistics (if queues initialized)
     const queueStats = {};
@@ -45,6 +52,13 @@ export const adminController = {
       // non-fatal: keep going
     }
 
-  res.apiSuccess({ total, pending, approved, retention, schedules, queueStats }, 'OK', 200);
+  res.apiSuccess({
+      totals: baseTotals,
+      retention,
+      schedules,
+      queueStats,
+      summary: reports.summary,
+      charts: reports.charts
+    }, 'OK', 200);
   }
 };

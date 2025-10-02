@@ -1,5 +1,5 @@
 import { representativeService } from '../services/representativeService.js';
-import { representativeInfoSchema } from '../validation/representative.js';
+import { representativeInfoSchema, bindRepresentativeSchema } from '../validation/representative.js';
 import { prisma } from '../config/prisma.js';
 import { logger } from '../utils/logger.js';
 
@@ -16,6 +16,37 @@ export const representativeController = {
     const region = req.query.region;
   const reps = await representativeService.listByRegion(region);
   res.apiSuccess(reps, 'OK', 200);
+  }
+};
+
+// Bind existing user (self or admin) to representative info (one or many entries)
+representativeController.bind = async function (req, res) {
+  try {
+    const body = { ...req.body };
+    if (typeof body.representativeInfo === 'string') {
+      try { body.representativeInfo = JSON.parse(body.representativeInfo); } catch (e) {}
+    }
+    const { error, value } = bindRepresentativeSchema.validate(body, { abortEarly: false });
+    if (error) return res.apiError(error.details.map(d => d.message).join(', '), 400);
+
+    const requester = req.user;
+    const isSelf = requester && requester.id === value.userId;
+    const isAdmin = requester && Array.isArray(requester.roles) && requester.roles.some(r => r.role === 'ADMIN' || r === 'ADMIN');
+    if (!isSelf && !isAdmin) return res.apiError('Not authorized', 403);
+
+    const user = await prisma.user.findUnique({ where: { id: value.userId } });
+    if (!user) return res.apiError('User not found', 404);
+
+    const created = await representativeService.bindMany(value.userId, value.representativeInfo);
+    // ensure representative role exists
+    try {
+      const hasRole = await prisma.userRole.findFirst({ where: { userId: value.userId, role: 'REPRESENTATIVE' } });
+      if (!hasRole) await prisma.userRole.create({ data: { userId: value.userId, role: 'REPRESENTATIVE' } });
+    } catch (e) {}
+
+    return res.apiSuccess({ count: created.length, representatives: created }, 'Bound', 201);
+  } catch (e) {
+    return res.apiError('Failed to bind representative info', 500);
   }
 };
 

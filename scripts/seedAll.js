@@ -80,7 +80,7 @@ async function main() {
 
   // Create Categories
   const categories = [];
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 10; i++) {
     const name = `Category ${i}`;
     const c = await prisma.category.create({ data: { name, slug: slugify(name) } });
     categories.push(c);
