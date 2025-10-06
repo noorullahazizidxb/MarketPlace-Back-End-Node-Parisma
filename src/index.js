@@ -27,7 +27,7 @@ const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
 app.use(compression());
-app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // attach JWT auth parsing middleware

@@ -15,7 +15,9 @@ export const QUEUES = {
 const connections = {};
 function getConnection() {
   if (!connections.primary) {
-  connections.primary = new IORedis(config.redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
+    const opts = { maxRetriesPerRequest: null, lazyConnect: false };
+    if (config.redisPassword) opts.password = config.redisPassword;
+    connections.primary = new IORedis(config.redisUrl, opts);
   }
   return connections.primary;
 }
