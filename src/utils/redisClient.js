@@ -5,11 +5,11 @@ let client;
 export function getRedis() {
   if (!client) {
   const opts = { maxRetriesPerRequest: null, lazyConnect: false };
-  // If a username/password is provided separately, pass it to the client options
-  if (config.redisUsername) opts.username = config.redisUsername;
-  if (config.redisPassword) opts.password = config.redisPassword;
-    // ioredis accepts a URL as first arg and options optionally contains password fallback
-    client = new IORedis(config.redisUrl, opts);
+    // If username/password are provided separately, pass them in options.
+    if (config.redisUsername) opts.username = config.redisUsername;
+    if (config.redisPassword) opts.password = config.redisPassword;
+    // Prefer URL if provided (it may also contain credentials), otherwise pass options only.
+    client = config.redisUrl ? new IORedis(config.redisUrl, opts) : new IORedis(opts);
     client.on('error', (e) => console.error('Redis error', e));
   }
   return client;

@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "reindex:all": "node scripts/reindex-search.js",
     "init:users-index": "node scripts/initUsersIndex.js",
-    "seed:all": "node scripts/seedAll.js"
+    "seed:all": "node scripts/seedAll.js",
+    "check:services": "node -r dotenv/config scripts/checkServices.js"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -16,9 +16,9 @@ const connections = {};
 function getConnection() {
   if (!connections.primary) {
   const opts = { maxRetriesPerRequest: null, lazyConnect: false };
-  if (config.redisUsername) opts.username = config.redisUsername;
-  if (config.redisPassword) opts.password = config.redisPassword;
-    connections.primary = new IORedis(config.redisUrl, opts);
+    if (config.redisUsername) opts.username = config.redisUsername;
+    if (config.redisPassword) opts.password = config.redisPassword;
+    connections.primary = config.redisUrl ? new IORedis(config.redisUrl, opts) : new IORedis(opts);
   }
   return connections.primary;
 }
