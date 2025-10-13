@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import fs from 'fs/promises';
+import path from 'path';
 const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 10;
@@ -44,6 +46,10 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.jobRecord.deleteMany();
   try { await prisma.ad.deleteMany(); } catch (e) {}
+  // Also clear uploaded listing images directory so we don't accumulate stale files across seeds
+  try {
+    await fs.rm(path.resolve(process.cwd(), 'uploads', 'listings'), { recursive: true, force: true });
+  } catch (e) {}
 
   // Create Users
   const users = [];
@@ -78,10 +84,20 @@ async function main() {
     await prisma.userRole.create({ data: { userId: u.id, role: 'USER' } });
   }
 
-  // Create Categories
+  // Create Categories (restricted list, <= 50 total; we only add specified 8)
+  const categoryNames = [
+    'Real State',
+    'Vehicles',
+    'Mobile & Electronic',
+    'Home & Office Appliances',
+    'Machinary',
+    'Personal Accessories',
+    'Food Items',
+    'Animal & Livestock'
+  ];
   const categories = [];
-  for (let i = 0; i < 10; i++) {
-    const name = `Category ${i}`;
+  for (const rawName of categoryNames) {
+    const name = rawName.trim();
     const c = await prisma.category.create({ data: { name, slug: slugify(name) } });
     categories.push(c);
   }
@@ -93,6 +109,22 @@ async function main() {
     const r = await prisma.representativeInfo.create({ data: { userId: userRef.id, region: `Region-${randInt(1,10)}`, whatsappNumber: `+93${100000000 + i}`, active: true } });
     reps.push(r);
   }
+
+  // Prepare seed image candidates (from Seed_Images directory). Fallback to root photo.jpg if none.
+  const seedImagesDir = path.resolve(process.cwd(), 'Seed_Images');
+  let seedImages = [];
+  try {
+    const files = await fs.readdir(seedImagesDir);
+    const exts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+    seedImages = files
+      .filter(f => exts.has(path.extname(f).toLowerCase()))
+      .map(f => path.join(seedImagesDir, f));
+  } catch (e) {
+    // directory might not exist; ignore
+  }
+  // fallback single sample image in repo root
+  const fallbackImage = path.resolve(process.cwd(), 'photo.jpg');
+  try { await fs.stat(fallbackImage); } catch (e) {}
 
   // Create Listings
   const listings = [];
@@ -113,13 +145,42 @@ async function main() {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30)
     }});
     listings.push(listing);
+
+    // Attach at least 2 images copied into uploads/listings/<id>/
+    try {
+      const destDir = path.resolve(process.cwd(), 'uploads', 'listings', listing.id);
+      await fs.mkdir(destDir, { recursive: true });
+      const picks = [];
+      const choose = () => {
+        if (seedImages && seedImages.length >= 1) {
+          return seedImages[Math.floor(Math.random() * seedImages.length)];
+        }
+        return fallbackImage;
+      };
+      // ensure at least two picks (can repeat if only one candidate)
+      picks.push(choose());
+      picks.push(choose());
+      let position = 0;
+      for (let p = 0; p < picks.length; p++) {
+        const src = picks[p];
+        const ext = path.extname(src) || '.jpg';
+        const fileName = `img${p+1}${ext}`;
+        const destPath = path.join(destDir, fileName);
+        try {
+          await fs.copyFile(src, destPath);
+        } catch (e) {
+          // if copy fails, continue to next
+        }
+        const url = `/uploads/listings/${listing.id}/${fileName}`;
+        try {
+          await prisma.listingImage.create({ data: { listingId: listing.id, url, position: position++ } });
+        } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn('Failed to attach images for listing', listing.id, e.message);
+    }
   }
 
-  // Listing Images (one per listing)
-  for (let i = 0; i < listings.length; i++) {
-    const l = listings[i];
-    await prisma.listingImage.create({ data: { listingId: l.id, url: `/uploads/listings/${l.id}/img1.jpg`, position: 0 } });
-  }
 
   // ListingRepresentative assignments
   for (let i = 0; i < 60; i++) {
@@ -173,7 +234,7 @@ async function main() {
       'DETAIL_PAGE_1ST','DETAIL_PAGE_2ND','DETAIL_PAGE_SIDEBAR'
     ];
     const sampleImages = [
-      'https://picsum.photos/seed/ad1/728/90',
+      'http://cdn.4imprint.com/qtz/headers/supergroups/193/img/tech040621.webp',
       'https://picsum.photos/seed/ad2/300/250',
       'https://picsum.photos/seed/ad3/600/160',
       'https://picsum.photos/seed/ad4/320/100',

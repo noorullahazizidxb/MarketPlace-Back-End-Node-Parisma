@@ -11,6 +11,7 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  redisUsername: process.env.REDIS_USERNAME || '',
   redisPassword: process.env.REDIS_PASSWORD || '',
   elastic: {
   node: process.env.ELASTICSEARCH_NODE || 'https://localhost:9200',
