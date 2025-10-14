@@ -23,7 +23,7 @@ socket.on('connect', () => {
 socket.on('disconnect', (reason) => console.log('socket disconnected:', reason));
 socket.on('connect_error', (err) => console.error('connect_error:', err.message));
 
-const events = ['blogCreated','blogUpdated','newComment','newLike','newShare','storyCreated','notification:new'];
+const events = ['blogCreated','blogUpdated','newComment','newLike','newShare','storyCreated','storyUpdated','storyDeleted','notification:new'];
 for (const ev of events) {
   socket.on(ev, (payload) => {
     console.log('\n== EVENT', ev, '==');
