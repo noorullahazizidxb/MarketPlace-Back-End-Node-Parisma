@@ -9,7 +9,8 @@ export const QUEUES = {
   MODERATION_CLEANUP: 'moderation-cleanup',
   SEARCH_INDEX: 'search-index',
   NOTIFICATION_DISPATCH: 'notification-dispatch',
-  RENEWAL_REMINDER: 'renewal-reminder'
+  RENEWAL_REMINDER: 'renewal-reminder',
+  CONTENT_CLEANUP: 'content-cleanup'
 };
 
 const connections = {};

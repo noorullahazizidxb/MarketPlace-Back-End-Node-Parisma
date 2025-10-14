@@ -27,12 +27,14 @@ export const config = {
   retention: {
     unapprovedDays: parseInt(process.env.UNAPPROVED_RETENTION_DAYS || '2', 10),
     renewWindowDays: parseInt(process.env.RENEW_WINDOW_DAYS || '14', 10),
+    contentCleanupDays: parseInt(process.env.CONTENT_CLEANUP_DAYS || '30', 10),
     // Removed: SOLD_RENTED_CLEANUP_DAYS, DRAFT_CLEANUP_DAYS, LISTING_DEFAULT_EXPIRY_DAYS, FEEDBACK_REMINDER_DAYS
   }
   ,
   // scheduled times for recurring jobs (HH:mm in 24h)
   schedules: {
     moderationCleanupTime: process.env.MODERATION_CLEANUP_TIME || '03:00',
-    renewalCleanupTime: process.env.RENEWAL_CLEANUP_TIME || '06:00'
+    renewalCleanupTime: process.env.RENEWAL_CLEANUP_TIME || '06:00',
+    contentCleanupTime: process.env.CONTENT_CLEANUP_TIME || '04:00'
   }
 };

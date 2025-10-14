@@ -18,3 +18,6 @@ export function requireRole(role) {
     next();
   };
 }
+
+// Convenience middleware specifically for admin-only routes
+export const requireAdmin = requireRole(Roles.ADMIN);

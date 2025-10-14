@@ -7,6 +7,8 @@ import { userController } from '../controllers/userController.js';
 const router = express.Router();
 const upload = multer({ dest: 'tmp/uploads' });
 router.get('/', attachAuth, requireAuth, requireRole(Roles.ADMIN), userController.list);
+// Follow a user (push the requesting user's id into the target user's followers array)
+router.get('/:id/follow', requireAuth, userController.follow);
 router.get('/:id', userController.get);
 // Return listings for the current authenticated user
 import { listingController } from '../controllers/listingController.js';

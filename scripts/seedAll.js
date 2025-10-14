@@ -3,6 +3,12 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import fs from 'fs/promises';
 import path from 'path';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { Queue } = require('bullmq');
+import IORedis from 'ioredis';
+import dotenv from 'dotenv';
+dotenv.config();
 const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 10;
@@ -31,6 +37,11 @@ async function main() {
 
   // Clean existing small sets (optional safe truncate)
   // WARNING: in production, be careful with deleteMany
+  // New content first (children before parents)
+  try { await prisma.storyImage.deleteMany(); } catch (e) {}
+  try { await prisma.story.deleteMany(); } catch (e) {}
+  try { await prisma.blogComment.deleteMany(); } catch (e) {}
+  try { await prisma.blog.deleteMany(); } catch (e) {}
   await prisma.notificationRecipient.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.searchIndex.deleteMany();
@@ -49,6 +60,13 @@ async function main() {
   // Also clear uploaded listing images directory so we don't accumulate stale files across seeds
   try {
     await fs.rm(path.resolve(process.cwd(), 'uploads', 'listings'), { recursive: true, force: true });
+  } catch (e) {}
+  // Clear uploads for stories and blogs as well
+  try {
+    await fs.rm(path.resolve(process.cwd(), 'uploads', 'stories'), { recursive: true, force: true });
+  } catch (e) {}
+  try {
+    await fs.rm(path.resolve(process.cwd(), 'uploads', 'blogs'), { recursive: true, force: true });
   } catch (e) {}
 
   // Create Users
@@ -115,7 +133,7 @@ async function main() {
   let seedImages = [];
   try {
     const files = await fs.readdir(seedImagesDir);
-    const exts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+    const exts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
     seedImages = files
       .filter(f => exts.has(path.extname(f).toLowerCase()))
       .map(f => path.join(seedImagesDir, f));
@@ -179,6 +197,92 @@ async function main() {
     } catch (e) {
       console.warn('Failed to attach images for listing', listing.id, e.message);
     }
+  }
+
+  // ------------------------------
+  // Seed Stories (admin-only creator)
+  // ------------------------------
+  const stories = [];
+  for (let i = 0; i < 20; i++) {
+    const title = `Story ${i + 1}: ${randText(3)}`;
+    const description = randText(30);
+    const videoMaybe = Math.random() < 0.25 ? 'https://www.w3schools.com/html/mov_bbb.mp4' : null;
+    const s = await prisma.story.create({ data: { title, description, videoUrl: videoMaybe, userId: adminUser.id } });
+    stories.push(s);
+    // Attach images copied into uploads/stories/<id>/
+    try {
+      const destDir = path.resolve(process.cwd(), 'uploads', 'stories', s.id);
+      await fs.mkdir(destDir, { recursive: true });
+      const picks = [];
+      const choose = () => {
+        if (seedImages && seedImages.length >= 1) {
+          return seedImages[Math.floor(Math.random() * seedImages.length)];
+        }
+        return fallbackImage;
+      };
+      picks.push(choose());
+      picks.push(choose());
+      let position = 0;
+      for (let p = 0; p < picks.length; p++) {
+        const src = picks[p];
+        const ext = path.extname(src) || '.jpg';
+        const fileName = `img${p + 1}${ext}`;
+        const destPath = path.join(destDir, fileName);
+        try { await fs.copyFile(src, destPath); } catch (e) {}
+        const url = `/uploads/stories/${s.id}/${fileName}`;
+        try { await prisma.storyImage.create({ data: { storyId: s.id, url, position: position++ } }); } catch (e) {}
+      }
+    } catch (e) {
+      console.warn('Failed to attach images for story', s.id, e.message);
+    }
+  }
+
+  // ------------------------------
+  // Seed Blogs (any user author)
+  // ------------------------------
+  const blogs = [];
+  for (let i = 0; i < 20; i++) {
+    const author = rndChoice(users);
+    const title = `Blog ${i + 1}: ${randText(4)}`;
+    const content = `${randText(80)}\n\n${randText(80)}`;
+    // Prepare blog images: copy to uploads/blogs/<id>/ after blog create (need id)
+    // Create with temporary empty images, then update
+    let blog = await prisma.blog.create({ data: { title, content, images: [], authorId: author.id } });
+    try {
+      const destDir = path.resolve(process.cwd(), 'uploads', 'blogs', blog.id);
+      await fs.mkdir(destDir, { recursive: true });
+      const picks = [];
+      const choose = () => {
+        if (seedImages && seedImages.length >= 1) {
+          return seedImages[Math.floor(Math.random() * seedImages.length)];
+        }
+        return fallbackImage;
+      };
+      // choose 2-3 images
+      const num = 2 + (Math.random() < 0.5 ? 1 : 0);
+      for (let p = 0; p < num; p++) picks.push(choose());
+      const urls = [];
+      for (let p = 0; p < picks.length; p++) {
+        const src = picks[p];
+        const ext = path.extname(src) || '.jpg';
+        const fileName = `img${p + 1}${ext}`;
+        const destPath = path.join(destDir, fileName);
+        try { await fs.copyFile(src, destPath); } catch (e) {}
+        const url = `/uploads/blogs/${blog.id}/${fileName}`;
+        urls.push(url);
+      }
+      blog = await prisma.blog.update({ where: { id: blog.id }, data: { images: urls, likes: randInt(0, 50), shares: randInt(0, 20) } });
+    } catch (e) {
+      console.warn('Failed to attach images for blog', blog.id, e.message);
+    }
+    // Seed some comments
+    const commentCount = randInt(0, 5);
+    for (let c = 0; c < commentCount; c++) {
+      try {
+        await prisma.blogComment.create({ data: { blogId: blog.id, authorId: rndChoice(users).id, body: randText(12) } });
+      } catch (e) {}
+    }
+    blogs.push(blog);
   }
 
 
@@ -276,6 +380,23 @@ async function main() {
   console.log('Seed summary:');
   console.log('  Admin account:', adminUser.email, '(password: password123)');
   console.log('  Representative samples:', repUsers.slice(0, 5).map(r => r.email));
+  console.log('  Stories:', stories.length);
+  console.log('  Blogs:', blogs.length);
+
+  // Optionally enqueue a one-off cleanup job (stories/blogs) variable days ahead to demonstrate job pipeline
+  try {
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
+    const contentQueue = new Queue('content-cleanup', { connection });
+    const days = parseInt(process.env.SEED_CONTENT_CLEANUP_DAYS || '45', 10);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    await contentQueue.add('seeded-content-cleanup', { cutoff: cutoff.toISOString(), types: ['story','blog'] }, { jobId: `seed-content-cleanup-${Date.now()}` });
+    console.log(`  Enqueued content cleanup job for items older than ${days} days.`);
+    await connection.quit();
+  } catch (e) {
+    console.warn('Could not enqueue content cleanup job:', e?.message);
+  }
   console.log('Seeding complete.');
 }
 

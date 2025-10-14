@@ -13,6 +13,8 @@ import themesRouter from './themes.js';
 import notificationsRouter from './notifications.js';
 import listingFeedbacksRouter from './listingFeedbacks.js';
 import adsRouter from './ads.js';
+import storiesRouter from './stories.js';
+import blogsRouter from './blogs.js';
 
 export function registerRoutes(app, upload) {
   const api = express.Router();
@@ -36,6 +38,8 @@ export function registerRoutes(app, upload) {
   api.use('/themes', (req, res, next) => { res.locals.entityName = 'Themes'; next(); }, themesRouter);
   api.use('/feedbacks', (req, res, next) => { res.locals.entityName = 'ListingFeedback'; next(); }, listingFeedbacksRouter);
   api.use('/ads', (req, res, next) => { res.locals.entityName = 'Ad'; next(); }, adsRouter);
+  api.use('/stories', (req, res, next) => { res.locals.entityName = 'Story'; next(); }, storiesRouter);
+  api.use('/blogs', (req, res, next) => { res.locals.entityName = 'Blog'; next(); }, blogsRouter);
 
   app.use('/api', api);
 }

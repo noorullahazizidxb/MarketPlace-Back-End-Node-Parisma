@@ -83,6 +83,8 @@ model User {
   contacts          Json?
   address           Json?
   metadata          Json?         // arbitrary profile / preference data
+  // Followers: store as JSON array of User IDs (strings). MySQL doesn't support array type; also our User.id is String (cuid).
+  followers         Json?
   passwordHash      String
   roles             UserRole[]
   listings          Listing[]
@@ -94,6 +96,10 @@ model User {
   // Audit logs where this user acted
   auditLogs         AuditLog[]
   feedbacks         ListingFeedback[]
+  // Authored content
+  stories           Story[]
+  blogs             Blog[]
+  blogComments      BlogComment[]
 
   @@index([phone])
 }
@@ -334,5 +340,67 @@ model Ad {
 
   @@index([placement])
   @@index([isActive])
+}
+
+// ------------------------------
+// New content models: Story & Blog
+// ------------------------------
+
+model Story {
+  id          String       @id @default(cuid())
+  createdAt   DateTime     @default(now())
+  title       String
+  description String       @db.Text
+  videoUrl    String?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  images      StoryImage[]
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model StoryImage {
+  id       Int    @id @default(autoincrement())
+  story    Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  storyId  String
+  url      String
+  position Int    @default(0)
+  alt      String?
+
+  @@index([storyId])
+}
+
+model Blog {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  title     String
+  content   String        @db.Text
+  images    Json?
+  likes     Int           @default(0)
+  shares    Int           @default(0)
+  // Track per-user likes/shares as JSON arrays of user IDs
+  likedBy   Json?
+  sharedBy  Json?
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  comments  BlogComment[]
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model BlogComment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  body      String   @db.Text
+  blog      Blog     @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  blogId    String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+
+  @@index([blogId])
+  @@index([authorId])
 }
 

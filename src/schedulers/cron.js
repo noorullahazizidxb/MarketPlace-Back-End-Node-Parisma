@@ -32,5 +32,17 @@ export async function scheduleRecurringJobs() {
     await queues[QUEUES.RENEWAL_REMINDER].add('immediate-renewal-reminder', {}, { jobId: `immediate-renewal-${Date.now()}` });
   }
 
+  // Content cleanup (stories & blogs) - daily
+  try {
+    const contentTime = config.schedules.contentCleanupTime || '04:00';
+    const [contentHour, contentMin] = contentTime.split(':').map(s => parseInt(s, 10));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (config.retention.contentCleanupDays || 30));
+    await queues[QUEUES.CONTENT_CLEANUP].add('daily-content-cleanup', { cutoff: cutoff.toISOString(), types: ['story','blog'] }, { repeat: { cron: `${contentMin} ${contentHour} * * *` }, jobId: 'daily-content-cleanup' });
+    if ((config.retention.contentCleanupDays || 30) === 0) {
+      await queues[QUEUES.CONTENT_CLEANUP].add('immediate-content-cleanup', { cutoff: new Date().toISOString(), types: ['story','blog'] }, { jobId: `immediate-content-${Date.now()}` });
+    }
+  } catch (e) {}
+
   logger.info('Scheduled recurring jobs');
 }

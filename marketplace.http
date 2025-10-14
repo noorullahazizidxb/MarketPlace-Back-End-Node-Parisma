@@ -11,6 +11,8 @@
 @categoryId = 1
 @representativeId = 1
 @roleAssignmentId = 1
+@storyId = STORY_ID
+@blogId = BLOG_ID
 
 ### Health
 GET {{host}}/health
@@ -800,3 +802,86 @@ Content-Type: application/json
 {
   "readAt": "2025-09-17T12:43:51.948Z"
 }
+
+### Stories - list (public)
+GET {{host}}/stories
+
+### Stories - create (admin-only) - JSON
+POST {{host}}/stories
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Seeded Story Example",
+  "description": "This is a seeded story created via REST client.",
+  "images": ["/uploads/Seed_Images/hdm-airpodsmax-046-1647967194.avif"],
+  "videoUrl": "https://www.w3schools.com/html/mov_bbb.mp4"
+}
+
+### Stories - create (admin-only) - multipart (upload images) - uses local file from Seed_Images
+POST {{host}}/stories
+Authorization: Bearer {{adminToken}}
+
+--file
+Content-Disposition: form-data; name="images"; filename="hdm-airpodsmax-046-1647967194.avif"
+Content-Type: image/avif
+
+< ./Seed_Images/hdm-airpodsmax-046-1647967194.avif
+
+--file
+Content-Disposition: form-data; name="title"
+
+Story with multipart images
+
+--file
+Content-Disposition: form-data; name="description"
+
+Multipart uploaded story created from seed image
+
+### Stories - get single
+GET {{host}}/stories/{{storyId}}
+
+### Blogs - list (public)
+GET {{host}}/blogs
+
+### Blogs - create (auth required)
+POST {{host}}/blogs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "My First Blog via REST",
+  "content": "Long form content goes here. This is created by the REST client.",
+  "images": ["/uploads/Seed_Images/W-O-X56-6-75inch-IPS-Octa-Core-64GB-Cellphone-Fashion-Smart-Phone-4G-Celulares-Mobile-Phone.avif"]
+}
+
+### Blogs - get single
+GET {{host}}/blogs/{{blogId}}
+
+### Blogs - update (author only)
+PUT {{host}}/blogs/{{blogId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Updated Blog Title",
+  "content": "Updated content..."
+}
+
+### Blogs - comment (authenticated)
+POST {{host}}/blogs/{{blogId}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "Nice post!\nFrom REST client."
+}
+
+### Blogs - like (authenticated)
+POST {{host}}/blogs/{{blogId}}/likes
+Authorization: Bearer {{token}}
+
+### Blogs - share (authenticated)
+POST {{host}}/blogs/{{blogId}}/shares
+Authorization: Bearer {{token}}
+

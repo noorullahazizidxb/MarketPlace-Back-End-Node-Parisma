@@ -84,11 +84,65 @@ export const userController = {
 userController.get = async function (req, res) {
   try {
     const id = req.params.id;
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representatives: true, followers: true } });
     if (!user) return res.apiError('Not found', 404);
+    // If followers is stored as JSON array of ids, expand them to include fullName and photo
+    let followersCount = 0;
+    try {
+      if (user.followers && Array.isArray(user.followers) && user.followers.length) {
+        const f = await prisma.user.findMany({ where: { id: { in: user.followers } }, select: { id: true, fullName: true, photo: true } });
+        user.followers = f;
+        followersCount = Array.isArray(f) ? f.length : 0;
+      } else if (Array.isArray(user.followers)) {
+        // followers present but empty
+        followersCount = user.followers.length;
+      }
+    } catch (e) {
+      // if prisma/field not supported, ignore and return raw followers
+      logger.warn({ err: e?.message }, 'Failed to expand followers list');
+      if (Array.isArray(user.followers)) followersCount = user.followers.length;
+    }
+    // attach followersCount for convenience
+    user.followersCount = followersCount;
     res.apiSuccess(user, 'OK', 200);
   } catch (e) {
     logger.error(e, 'Failed to get user');
+    res.apiError('Failed', 500);
+  }
+};
+
+userController.follow = async function (req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.apiError('Unauthorized', 401);
+    const targetId = req.params.id;
+    if (!targetId) return res.apiError('Invalid target', 400);
+    if (userId === targetId) return res.apiError('Cannot follow yourself', 400);
+    // Load target user
+    const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, followers: true } });
+    if (!target) return res.apiError('User not found', 404);
+    let followers = target.followers || [];
+    if (!Array.isArray(followers)) followers = [];
+    // push if not present
+    if (!followers.includes(userId)) {
+      followers.push(userId);
+      try {
+        await prisma.user.update({ where: { id: targetId }, data: { followers } });
+      } catch (err) {
+        // fallback for schema mismatches
+        logger.warn({ err: err?.message }, 'Failed to update followers field directly');
+        return res.apiError('Failed to follow user', 500);
+      }
+    }
+    // return updated follower list expanded
+    try {
+      const f = await prisma.user.findMany({ where: { id: { in: followers } }, select: { id: true, fullName: true, photo: true } });
+      return res.apiSuccess({ followers: f }, 'Followed', 200);
+    } catch (e) {
+      return res.apiSuccess({ followers }, 'Followed', 200);
+    }
+  } catch (e) {
+    logger.error(e, 'Failed to follow user');
     res.apiError('Failed', 500);
   }
 };
