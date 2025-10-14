@@ -138,11 +138,18 @@ export const blogController = {
       const { error, value } = createCommentSchema.validate(req.body);
       if (error) return res.apiError(error.message, 400);
       const c = await blogService.addComment(id, req.user.id, value.body);
+      // reload comment to include author details (fullName, photo)
+      let fullComment = null;
+      try {
+        fullComment = await prisma.blogComment.findUnique({ where: { id: c.id }, include: { author: { select: { id: true, fullName: true, photo: true } } } });
+      } catch (e) {
+        logger.warn({ err: e?.message }, 'Failed to reload comment with author');
+      }
       try {
         const { getIO } = await import('../websocket/socket.js');
-        getIO().emit('newComment', { blogId: id, comment: { ...c, author: { id: req.user.id } } });
+        getIO().emit('newComment', { blogId: id, comment: fullComment || { ...c, author: { id: req.user.id } } });
       } catch (e) {}
-      return res.apiSuccess(c, 'Created', 201);
+      return res.apiSuccess(fullComment || c, 'Created', 201);
     } catch (e) {
       logger.error(e);
       return res.apiError('Failed', 500);
