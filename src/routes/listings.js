@@ -1,6 +1,7 @@
 import express from 'express';
 import { listingController } from '../controllers/listingController.js';
 import multer from 'multer';
+import { compressUploads } from '../middleware/compressUploads.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -17,14 +18,14 @@ router.get('/for-approval', requireAuth, listingController.forApproval);
 // Force emit all pending listings to admin sockets (admin only)
 router.post('/for-approval/emit-all', requireAuth, listingController.emitAllForApproval);
 // Create a listing (user) - accept multipart/form-data (files + fields)
-router.post('/', requireAuth, upload.any(), listingController.create);
+router.post('/', requireAuth, upload.any(), compressUploads, listingController.create);
 
 // Get listing
 router.get('/:id', listingController.get);
 
 // Full update and partial update (authenticated users)
-router.put('/:id', requireAuth, upload.any(), listingController.update);
-router.patch('/:id', requireAuth, upload.any(), listingController.patch);
+router.put('/:id', requireAuth, upload.any(), compressUploads, listingController.update);
+router.patch('/:id', requireAuth, upload.any(), compressUploads, listingController.patch);
 
 // Update contact visibility and bind representatives by location when hiding seller
 router.post('/:id', requireAuth, listingController.updateVisibilityAndBindReps);

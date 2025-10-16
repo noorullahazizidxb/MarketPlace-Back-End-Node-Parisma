@@ -58,4 +58,10 @@ export const blogRepository = {
       throw err;
     }
   }
+  ,
+  async remove(id) {
+    // delete comments first (cascade may handle it, but be explicit)
+    await prisma.blogComment.deleteMany({ where: { blogId: id } });
+    return prisma.blog.delete({ where: { id } });
+  }
 };

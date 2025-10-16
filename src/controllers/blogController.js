@@ -118,14 +118,49 @@ export const blogController = {
       if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) {} }
       const { error, value } = updateBlogSchema.validate(payload);
       if (error) return res.apiError(error.message, 400);
+      // load existing to get previous images
+      const existing = await blogService.getById(id);
+      if (!existing) return res.apiError('Not found', 404);
+      // enforce author ownership
+      if (existing.author.id !== req.user.id && !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      // update textual fields first
       const updated = await blogService.updateBlog(id, value, req.user.id);
+      // If files uploaded, replace old files with new ones
+      if (Array.isArray(req.files) && req.files.length) {
+        try {
+          // remove old files if any
+          const oldImages = Array.isArray(existing.images) ? existing.images : [];
+          for (const img of oldImages) {
+            try { await storage.deletePath(img); } catch (e) { logger.warn({ err: e?.message, img }, 'Failed to delete old blog image'); }
+          }
+          // save new files
+          const uploadsDir = `uploads/blogs/${id}`;
+          const urls = [];
+          for (let i = 0; i < req.files.length; i++) {
+            const f = req.files[i];
+            try {
+              const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
+              const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+              urls.push(url);
+            } catch (e) {
+              logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded blog image');
+            }
+          }
+          if (urls.length) {
+            try { await prisma.blog.update({ where: { id }, data: { images: urls } }); } catch (e) { logger.warn({ err: e?.message }, 'Failed to update blog images after upload'); }
+          }
+        } catch (e) { logger.warn({ err: e?.message }, 'Failed handling uploaded files for blog update'); }
+      }
+      // reload full blog
+      let fullBlog = null;
+      try { fullBlog = await blogService.getById(id); } catch (e) { logger.warn({ err: e?.message }, 'Failed to reload blog after update'); }
       // WS broadcast
       try {
         const { getIO } = await import('../websocket/socket.js');
         logger.info({ id }, 'Emitting blogUpdated');
-        getIO().emit('blogUpdated', { id, blog: updated });
+        getIO().emit('blogUpdated', { id, blog: fullBlog || updated });
       } catch (e) { logger.warn({ err: e?.message }, 'Failed to emit blogUpdated'); }
-      return res.apiSuccess(updated, 'Updated', 200);
+      return res.apiSuccess(fullBlog || updated, 'Updated', 200);
     } catch (e) {
       logger.error(e);
       return res.apiError(e.status === 403 ? 'Forbidden' : (e.message === 'Not found' ? 'Not found' : 'Internal Server Error'), e.status || (e.message === 'Not found' ? 404 : 500));
@@ -182,6 +217,36 @@ export const blogController = {
         getIO().emit('newShare', { blogId: id, shares: b.shares, shared, userId: req.user.id });
       } catch (e) {}
       return res.apiSuccess({ id: b.id, shares: b.shares, shared }, 'OK', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError('Failed', 500);
+    }
+  }
+  ,
+  async delete(req, res) {
+    try {
+      if (!req.user) return res.apiError('Unauthorized', 401);
+      const id = req.params.id;
+      const existing = await blogService.getById(id);
+      if (!existing) return res.apiError('Not found', 404);
+      // only author or admin can delete
+      if (existing.author.id !== req.user.id && !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      // delete files folder
+      try {
+        await storage.deleteDirectory(`uploads/blogs/${id}`);
+        if (Array.isArray(existing.images)) {
+          for (const img of existing.images) {
+            try { await storage.deletePath(img); } catch (e) {}
+          }
+        }
+      } catch (e) { logger.warn({ err: e?.message }, 'Failed to delete blog files'); }
+      // delete DB row
+      await blogService.deleteBlog(id);
+      try {
+        const { getIO } = await import('../websocket/socket.js');
+        getIO().emit('blogDeleted', { id });
+      } catch (e) {}
+      return res.apiSuccess({ id }, 'Deleted', 200);
     } catch (e) {
       logger.error(e);
       return res.apiError('Failed', 500);

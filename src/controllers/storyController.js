@@ -70,12 +70,48 @@ export async function updateStory(req, res) {
     if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) {} }
     const { error, value } = updateStorySchema.validate(payload);
     if (error) return res.apiError(error.message, 400);
+    // Load existing to manage file cleanup if new uploads are provided
+    let existing = null;
+    try { existing = await prisma.story.findUnique({ where: { id }, include: { images: true } }); } catch {}
     const updated = await storyService.updateStory(id, value);
+    // If new files uploaded via multipart, replace physical files and DB image records
+    if (Array.isArray(req.files) && req.files.length) {
+      try {
+        // Delete previous files and DB rows
+        if (existing && Array.isArray(existing.images)) {
+          for (const img of existing.images) {
+            try { await storage.deletePath(img.url); } catch {}
+          }
+          try { await prisma.storyImage.deleteMany({ where: { storyId: id } }); } catch {}
+        }
+        // Save new files
+        const uploadsDir = `uploads/stories/${id}`;
+        const urls = [];
+        for (let i = 0; i < req.files.length; i++) {
+          const f = req.files[i];
+          try {
+            const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
+            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            urls.push(url);
+          } catch (e) {
+            logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded story image on update');
+          }
+        }
+        if (urls.length) {
+          try { await prisma.storyImage.createMany({ data: urls.map((u, idx) => ({ storyId: id, url: u, position: idx })) }); } catch {}
+        }
+      } catch (e) {
+        logger.warn({ err: e?.message }, 'Failed handling uploaded files for story update');
+      }
+    }
+    // Reload full story entity for consistent response and WS
+    let full = updated;
+    try { full = await prisma.story.findUnique({ where: { id }, include: { images: true, user: { select: { id: true, fullName: true, photo: true } } } }); } catch {}
     try {
       const { getIO } = await import('../websocket/socket.js');
-      getIO().emit('storyUpdated', { id, story: updated });
+      getIO().emit('storyUpdated', { id, story: full || updated });
     } catch {}
-    return res.apiSuccess(updated, 'Updated', 200);
+    return res.apiSuccess(full || updated, 'Updated', 200);
   } catch (e) {
     logger.error(e);
     return res.apiError('Failed', 500);
@@ -86,6 +122,16 @@ export async function deleteStory(req, res) {
   try {
     if (!req.user || !req.user.roles?.includes('ADMIN')) return res.apiError('Forbidden', 403);
     const id = req.params.id;
+    // Delete physical files first (best-effort)
+    try {
+      const existing = await prisma.story.findUnique({ where: { id }, include: { images: true } });
+      if (existing && Array.isArray(existing.images)) {
+        for (const img of existing.images) {
+          try { await storage.deletePath(img.url); } catch {}
+        }
+      }
+      await storage.deleteDirectory(`uploads/stories/${id}`);
+    } catch (e) { logger.warn({ err: e?.message }, 'Failed to delete story files from disk'); }
     await storyService.deleteStory(id);
     try {
       const { getIO } = await import('../websocket/socket.js');

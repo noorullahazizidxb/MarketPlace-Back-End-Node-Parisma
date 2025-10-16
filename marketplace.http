@@ -841,6 +841,56 @@ Multipart uploaded story created from seed image
 ### Stories - get single
 GET {{host}}/stories/{{storyId}}
 
+### Stories - update (admin-only)
+PUT {{host}}/stories/{{storyId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Updated Story Title",
+  "description": "Updated description from REST client.",
+  "images": ["/uploads/stories/{{storyId}}/hdm-airpodsmax-046-1647967194.avif"],
+  "videoUrl": "https://www.w3schools.com/html/mov_bbb.mp4"
+}
+
+### Stories - delete (admin-only)
+DELETE {{host}}/stories/{{storyId}}
+Authorization: Bearer {{adminToken}}
+
+### Frontend integration - example commands
+# Use these as guidance when integrating Story live updates into a React app (React Query + Socket.IO)
+# 1) Register socket listeners on app start or in a hook:
+#    socket.on('storyCreated', (story) => queryClient.setQueryData(['stories'], old => [story, ...(old||[])]))
+#    socket.on('storyUpdated', ({ id, story }) => queryClient.setQueryData(['stories'], old => (old||[]).map(s => s.id === id ? story : s)))
+#    socket.on('storyDeleted', ({ id }) => queryClient.setQueryData(['stories'], old => (old||[]).filter(s => s.id !== id)))
+# 2) Use optimistic updates for admin mutatations (create/update/delete) with rollback on error.
+
+### GPT-5 Mini prompt for frontend integration (copy-paste)
+You are building the frontend integration for a Node.js/Express backend that serves Story entities and broadcasts live events via Socket.IO. Implement React hooks and UI handlers that:
+
+- Use React Query for data fetching with keys: ['stories'] (list) and ['stories', id] (single)
+- Connect to Socket.IO with an auth token and expose a singleton socket client with add/remove listener helpers
+- React to these socket events:
+  - storyCreated: payload is a Story object — prepend to the stories list
+  - storyUpdated: payload is { id, story } — update the matching story in the list
+  - storyDeleted: payload is { id } — remove the story from the list
+- Implement mutations for admin users:
+  - createStory (POST /api/stories) — optimistic prepend, rollback on error, then confirm from server
+  - updateStory (PUT /api/stories/:id) — optimistic patch the story in the cache, rollback on error
+  - deleteStory (DELETE /api/stories/:id) — optimistic remove, rollback on error
+- Provide code signatures and small examples for these hooks:
+  - useStories(), useCreateStory(), useUpdateStory(), useDeleteStory(), useSocket()
+- Ensure listeners are de-registered to avoid duplication on hot reloads or route changes
+- Keep payload shapes minimal and consistent: Story = { id, title, description, images[], videoUrl, createdAt, user: { id, fullName, photo } }
+- Acceptance criteria:
+  - Creating a story as admin shows the new story immediately on all connected clients
+  - Updating a story updates it in place on all clients
+  - Deleting a story removes it on all clients
+  - No duplicate socket listeners after navigation or reload
+
+Provide a minimal code example (React + TypeScript optional) for the socket hook, one mutation hook, and the cache update handlers for the three events. Keep examples compact and focused on integration logic only.
+
+
 ### Blogs - list (public)
 GET {{host}}/blogs
 
@@ -867,6 +917,31 @@ Content-Type: application/json
   "title": "Updated Blog Title",
   "content": "Updated content..."
 }
+
+### Blogs - update (multipart with file replace)
+PUT {{host}}/blogs/{{blogId}}
+Authorization: Bearer {{token}}
+
+--file
+Content-Disposition: form-data; name="images"; filename="W-O-X56-6-75inch-IPS-Octa-Core-64GB-Cellphone-Fashion-Smart-Phone-4G-Celulares-Mobile-Phone.avif"
+Content-Type: image/avif
+
+< ./Seed_Images/W-O-X56-6-75inch-IPS-Octa-Core-64GB-Cellphone-Fashion-Smart-Phone-4G-Celulares-Mobile-Phone.avif
+
+--file
+Content-Disposition: form-data; name="title"
+
+Updated via multipart
+
+--file
+Content-Disposition: form-data; name="content"
+
+Updated content via multipart
+
+### Blogs - delete (author or admin)
+DELETE {{host}}/blogs/{{blogId}}
+Authorization: Bearer {{token}}
+
 
 ### Blogs - comment (authenticated)
 POST {{host}}/blogs/{{blogId}}/comments

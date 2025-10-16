@@ -15,6 +15,9 @@ export const blogService = {
     }
     return blogRepository.update(id, payload);
   },
+  async deleteBlog(id) {
+    return blogRepository.remove(id);
+  },
   async listBlogs() {
     return blogRepository.list();
   },
