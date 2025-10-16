@@ -73,7 +73,9 @@ export async function updateStory(req, res) {
     // Load existing to manage file cleanup if new uploads are provided
     let existing = null;
     try { existing = await prisma.story.findUnique({ where: { id }, include: { images: true } }); } catch {}
-    const updated = await storyService.updateStory(id, value);
+  // If files are being uploaded, avoid passing images array to service to prevent double replacement
+  const callPayload = (Array.isArray(req.files) && req.files.length && Array.isArray(value.images)) ? (() => { const { images, ...rest } = value; return rest; })() : value;
+  const updated = await storyService.updateStory(id, callPayload);
     // If new files uploaded via multipart, replace physical files and DB image records
     if (Array.isArray(req.files) && req.files.length) {
       try {
