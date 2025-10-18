@@ -14,6 +14,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 secrets.txt
+uploads/*
+uploads/**/*
+!uploads/keep.txt
+
 config/local.settings.json
 
 # Common OS files
