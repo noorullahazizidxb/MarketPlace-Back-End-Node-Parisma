@@ -67,6 +67,13 @@ enum AdPlacement {
   DETAIL_PAGE_SIDEBAR
 }
 
+enum ContactSubject {
+  generalQuestion
+  listingSupport
+  accountIssue
+  partnershipInquiry
+}
+
 // --------------------------------------------------
 // Models
 // --------------------------------------------------
@@ -402,5 +409,16 @@ model BlogComment {
 
   @@index([blogId])
   @@index([authorId])
+}
+
+// Simple contact form entries collected via API
+model Contact {
+  id        Int            @id @default(autoincrement())
+  createdAt DateTime       @default(now())
+  name      String
+  email     String
+  subject   ContactSubject
+  phone     String?
+  message   String         @db.Text
 }
 

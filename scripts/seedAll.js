@@ -10,6 +10,7 @@ import IORedis from 'ioredis';
 import dotenv from 'dotenv';
 dotenv.config();
 const prisma = new PrismaClient();
+import { compressFile } from '../src/middleware/compressUploads.js';
 
 const SALT_ROUNDS = 10;
 
@@ -71,6 +72,11 @@ async function main() {
 
   // Create Users
   const users = [];
+  // collect profile candidates
+  const profileDir = path.resolve(process.cwd(), 'Seed_Images', 'UserProfileImages');
+  let profileCandidates = [];
+  try { const pfiles = await fs.readdir(profileDir); profileCandidates = pfiles.map(f => path.join(profileDir, f)); } catch (e) { profileCandidates = []; }
+
   for (let i = 0; i < 60; i++) {
     const email = `user${i}@example.com`;
     const rawPassword = 'password123';
@@ -83,6 +89,32 @@ async function main() {
     const address = { street: `Street ${i}`, city: `City-${randInt(1,20)}`, country: 'AF' };
     const u = await prisma.user.create({ data: { email, phone, passwordHash, photo: null, firstName, lastName, fullName, contacts, address } });
     users.push(u);
+  }
+
+  // Attach profile images from Seed_Images/UserProfileImages (round-robin) and compress
+  if (profileCandidates.length) {
+    for (let idx = 0; idx < users.length; idx++) {
+      const u = users[idx];
+      try {
+        const pick = profileCandidates[idx % profileCandidates.length];
+        const ext = path.extname(pick) || '.jpg';
+        const uploadsDir = path.resolve(process.cwd(), 'uploads', 'users');
+        await fs.mkdir(uploadsDir, { recursive: true });
+        const destName = `${u.id}${ext}`;
+        const destPath = path.join(uploadsDir, destName);
+        // copy the source image into temp location for compression
+        await fs.copyFile(pick, destPath);
+        // Attempt to compress the newly copied file (mimetype guessed from ext)
+        const mimetype = ext.toLowerCase().includes('png') ? 'image/png' : ext.toLowerCase().includes('webp') ? 'image/webp' : ext.toLowerCase().includes('avif') ? 'image/avif' : 'image/jpeg';
+        try { await compressFile(destPath, mimetype); } catch (e) { /* non-fatal */ }
+        const url = `/uploads/users/${destName}`;
+        await prisma.user.update({ where: { id: u.id }, data: { photo: url } });
+        // update local users array reference
+        u.photo = url;
+      } catch (e) {
+        // ignore profile attach failures
+      }
+    }
   }
 
   // Create role assignments for seeded users

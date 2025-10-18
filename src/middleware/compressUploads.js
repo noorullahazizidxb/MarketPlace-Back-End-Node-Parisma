@@ -50,6 +50,13 @@ async function compressOne(file) {
   }
 }
 
+// Expose a utility to compress a single file path (compatible with multer file-like objects)
+export async function compressFile(tmpPath, mimetype) {
+  if (!tmpPath) return;
+  const fake = { path: tmpPath, mimetype };
+  return compressOne(fake);
+}
+
 export async function compressUploads(req, res, next) {
   try {
     if (Array.isArray(req.files) && req.files.length) {
