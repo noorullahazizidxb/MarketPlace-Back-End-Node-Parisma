@@ -36,9 +36,21 @@ async function compressOne(file) {
       return;
     }
 
-    // Replace original temp path with compressed file
+    // Replace original temp path with compressed file (Windows-safe)
     try { await fs.unlink(input); } catch {}
-    await fs.rename(tmpOut, input);
+    try {
+      await fs.rename(tmpOut, input);
+    } catch (e) {
+      const code = e && e.code;
+      if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES' || code === 'EXDEV') {
+        // Fallback: copy then unlink tmpOut
+        const data = await fs.readFile(tmpOut);
+        await fs.writeFile(input, data);
+        try { await fs.unlink(tmpOut); } catch {}
+      } else {
+        throw e;
+      }
+    }
     try {
       const stat = await fs.stat(input);
       file.size = stat.size;
@@ -60,7 +72,11 @@ export async function compressFile(tmpPath, mimetype) {
 export async function compressUploads(req, res, next) {
   try {
     if (Array.isArray(req.files) && req.files.length) {
-      await Promise.all(req.files.map(f => compressOne(f)));
+      // Run sequentially to minimize Windows file lock contention
+      for (const f of req.files) {
+        // eslint-disable-next-line no-await-in-loop
+        await compressOne(f);
+      }
     } else if (req.file) {
       await compressOne(req.file);
     }
