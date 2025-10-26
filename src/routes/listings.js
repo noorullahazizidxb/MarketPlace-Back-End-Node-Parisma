@@ -34,5 +34,7 @@ router.post('/:id', requireAuth, listingController.updateVisibilityAndBindReps);
 router.post('/:id/approve', requireAuth, listingController.approve);
 // Admin reject
 router.post('/:id/reject', requireAuth, listingController.reject);
+// Delete a listing (owner or admin) - removes DB record and uploaded files
+router.delete('/:id', requireAuth, listingController.delete);
 
 export default router;

@@ -235,6 +235,24 @@ export const listingController = {
     }
   }
   ,
+  async delete(req, res) {
+    try {
+      const id = req.params.id;
+      const userId = req.user?.id;
+      if (!userId) return res.apiError('Unauthorized', 401);
+
+      const isAdmin = Array.isArray(req.user?.roles) && req.user.roles.includes('ADMIN');
+      const deleted = await listingService.deleteListing(id, userId, isAdmin);
+      if (deleted === null) return res.apiError('Not found', 404);
+
+      return res.apiSuccess(null, 'Deleted', 200);
+    } catch (e) {
+      if (e && e.message === 'Forbidden') return res.apiError('Forbidden', 403);
+      if (e && e.message === 'Unauthorized') return res.apiError('Unauthorized', 401);
+      logger.error(e, 'Failed to delete listing');
+      return res.apiError('Delete failed', 500);
+    }
+  },
   async uploadImage(req, res) {
     try {
       const id = req.params.id;

@@ -186,6 +186,41 @@ export const listingService = {
   return full;
   }
   ,
+  async deleteListing(listingId, actorId, actorIsAdmin = false) {
+    // fetch listing to check ownership and existence
+    const listing = await listingRepository.getById(listingId);
+    if (!listing) return null;
+
+    // only owner or admin can delete
+    if (!actorId) throw new Error('Unauthorized');
+    if (!actorIsAdmin && String(listing.userId) !== String(actorId)) throw new Error('Forbidden');
+
+    // remove renew tokens and related rows
+    try {
+      await prisma.listingRenewToken.deleteMany({ where: { listingId } });
+    } catch (e) {
+      // continue even if token cleanup fails
+    }
+
+    // delete repository (will remove files and DB row)
+    const deleted = await listingRepository.delete(listingId);
+
+    // invalidate cache
+    try { await redisDel(`listing:${listingId}`); } catch (e) {}
+
+    // Optionally enqueue search index/cleanup job - best-effort
+    try {
+      const q = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
+      if (typeof q?.add === 'function') {
+        await q.add('remove-listing', { listingId });
+      }
+    } catch (e) {
+      logger.warn(e, 'Failed to enqueue remove-listing job');
+    }
+
+    logger.info({ listingId, actorId }, 'Listing deleted');
+    return deleted;
+  },
   async rejectListing(listingId, adminId, opts = {}) {
     const data = {
       status: 'REJECTED',

@@ -24,13 +24,21 @@ export const listingRepository = {
   },
 
   async delete(id) {
-    // remove listing images directory and any assets
+    // remove listing images directory and any assets (await filesystem ops)
     try {
       const dir = `uploads/listings/${id}`;
-      storage.deleteDirectory(dir);
+      await storage.deleteDirectory(dir);
     } catch (e) {
-      // ignore
+      // ignore filesystem failures but log if needed in caller
     }
+
+    // remove any listing images rows first to keep DB clean, then delete listing row
+    try {
+      await prisma.listingImage.deleteMany({ where: { listingId: id } });
+    } catch (e) {
+      // ignore if table relations or cascade already handle it
+    }
+
     return prisma.listing.delete({ where: { id } });
   },
 
