@@ -16,6 +16,7 @@
     "reindex:all": "node scripts/reindex-search.js",
     "init:users-index": "node scripts/initUsersIndex.js",
     "seed:all": "node scripts/seedAll.js",
+    "seed:admin": "node scripts/seedAdmin.js",
     "check:services": "node -r dotenv/config scripts/checkServices.js"
   },
   "engines": {
