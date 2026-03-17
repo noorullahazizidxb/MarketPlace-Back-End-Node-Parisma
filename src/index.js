@@ -11,11 +11,10 @@ import { responseWrapper } from './middleware/responseWrapper.js';
 import { apiRateLimiter } from './middleware/rateLimit.js';
 import path from 'path';
 import { initQueues } from './jobs/queues.js';
-import { initSearch } from './search/elasticsearch.js';
+import { initBlogsIndex, initSearch, initUsersIndex } from './search/elasticsearch.js';
 import { scheduleRecurringJobs } from './schedulers/cron.js';
 
 // import workers so they are instantiated
-import './workers/searchWorker.js';
 import './workers/moderationWorker.js';
 import './workers/notificationWorker.js';
 import './workers/renewalReminderWorker.js';
@@ -61,7 +60,14 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
-    await initSearch();
+    if (config.elastic.enabled) {
+      await initSearch();
+      await initUsersIndex();
+      await initBlogsIndex();
+      await import('./workers/searchWorker.js');
+    } else {
+      logger.info('Elasticsearch disabled via ENABLE-ELASTIC-SEARCH; starting with database-backed search fallbacks');
+    }
   } catch (e) {
     logger.warn(e, 'Elasticsearch init failed - continuing without search (make sure ES is running)');
   }
@@ -69,8 +75,8 @@ async function start() {
   // Log retention/cleanup and reminder days on startup
   try {
     const r = config.retention || {};
-  const s = config.schedules || {};
-  logger.info({ retention: r, schedules: s }, 'Retention and scheduled job times (days / HH:mm)');
+    const s = config.schedules || {};
+    logger.info({ retention: r, schedules: s }, 'Retention and scheduled job times (days / HH:mm)');
   } catch (e) {
     logger.warn(e, 'Failed to log retention configuration');
   }

@@ -5,28 +5,29 @@ import { storage } from '../utils/storage.js';
 import { updateUserSchema, updateProfileSchema } from '../validation/user.js';
 import { hashPassword } from '../utils/password.js';
 import { searchUsers, suggestUsers } from '../search/elasticsearch.js';
+import { config } from '../config/index.js';
 
 
 export const userController = {
   async uploadPhoto(req, res) {
     try {
       const userId = req.user?.id;
-  if (!userId) return res.apiError('Unauthorized', 401);
-  if (!req.file) return res.apiError('No file uploaded', 400);
+      if (!userId) return res.apiError('Unauthorized', 401);
+      if (!req.file) return res.apiError('No file uploaded', 400);
 
-    // move file from multer tmp to uploads/users/{userId}_{originalname}
-    const uploadsDir = path.join('uploads', 'users');
-  const dest = await storage.saveTempTo(uploadsDir, req.file.path, `${userId}_${req.file.originalname}`);
-  const url = `/${dest}`;
-  // delete previous photo if present
-  const prev = (await prisma.user.findUnique({ where: { id: userId } })).photo;
-  if (prev) await storage.deletePath(prev);
-  await prisma.user.update({ where: { id: userId }, data: { photo: url } });
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
-  res.apiSuccess({ photo: url, user }, 'Uploaded', 201);
+      // move file from multer tmp to uploads/users/{userId}_{originalname}
+      const uploadsDir = path.join('uploads', 'users');
+      const dest = await storage.saveTempTo(uploadsDir, req.file.path, `${userId}_${req.file.originalname}`);
+      const url = `/${dest}`;
+      // delete previous photo if present
+      const prev = (await prisma.user.findUnique({ where: { id: userId } })).photo;
+      if (prev) await storage.deletePath(prev);
+      await prisma.user.update({ where: { id: userId }, data: { photo: url } });
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
+      res.apiSuccess({ photo: url, user }, 'Uploaded', 201);
     } catch (e) {
       logger.error(e, 'Failed to upload user photo');
-  res.apiError('Upload failed', 500);
+      res.apiError('Upload failed', 500);
     }
   }
   ,
@@ -34,9 +35,9 @@ export const userController = {
     try {
       const userId = req.user?.id;
       if (!userId) return res.apiError('Unauthorized', 401);
-  const { error, value } = updateProfileSchema.validate(req.body);
+      const { error, value } = updateProfileSchema.validate(req.body);
       if (error) return res.apiError(error.message, 400);
-  const { firstName, lastName, contacts, address, metadata, password } = value;
+      const { firstName, lastName, contacts, address, metadata, password } = value;
       const data = {};
       if (firstName !== undefined) data.firstName = firstName;
       if (lastName !== undefined) data.lastName = lastName;
@@ -67,7 +68,7 @@ export const userController = {
       }
       let user;
       try {
-  user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
+        user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } catch (err) {
         if (err && err.message && err.message.includes('Unknown field `metadata`')) {
           user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
@@ -84,7 +85,7 @@ export const userController = {
 userController.get = async function (req, res) {
   try {
     const id = req.params.id;
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true,metadata:true, roles: true, listings: { include: { images: true, category: true } }, representatives: true, followers: true } });
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, metadata: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true, followers: true } });
     if (!user) return res.apiError('Not found', 404);
     // If followers is stored as JSON array of ids, expand them to include fullName and photo
     let followersCount = 0;
@@ -165,10 +166,10 @@ userController.updateById = async function (req, res) {
     }
     let user;
     try {
-  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
+      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
     } catch (err) {
       if (err && err.message && err.message.includes('Unknown field `metadata`')) {
-  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
+        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } else throw err;
     }
     res.apiSuccess(user, 'Updated', 200);
@@ -196,10 +197,10 @@ userController.patchById = async function (req, res) {
     }
     let user;
     try {
-  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
+      user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, metadata: true, listings: { include: { images: true, category: true } }, representatives: true } });
     } catch (err) {
       if (err && err.message && err.message.includes('Unknown field `metadata`')) {
-  user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
+        user = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true } });
       } else throw err;
     }
     res.apiSuccess(user, 'Patched', 200);
@@ -215,8 +216,39 @@ userController.list = async function (req, res) {
     const page = parseInt(req.query.page || '1', 10);
     const perPage = parseInt(req.query.perPage || '50', 10);
     const q = (req.query.q || '').trim();
+    const findUsersInDb = async () => {
+      const where = q
+        ? {
+          OR: [
+            { fullName: { contains: q } },
+            { firstName: { contains: q } },
+            { lastName: { contains: q } },
+            { email: { contains: q } },
+            { phone: { contains: q } }
+          ]
+        }
+        : undefined;
+
+      return prisma.user.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, email: true, phone: true, photo: true, firstName: true, lastName: true, fullName: true, contacts: true, address: true, roles: true, listings: { include: { images: true, category: true } }, representatives: true }
+      });
+    };
+
     if (q) {
       const wantAutocomplete = (req.query.autocomplete === 'true' || req.query.autocomplete === '1');
+      if (!config.elastic.enabled) {
+        const users = await findUsersInDb();
+        if (wantAutocomplete) {
+          const suggestions = users.map((user) => user.fullName || user.email || user.phone).filter(Boolean).slice(0, perPage);
+          return res.apiSuccess({ autocomplete: { prefix: q, suggestions, strategy: 'db-filter' }, hits: users }, 'OK', 200);
+        }
+        return res.apiSuccess({ total: users.length, items: users }, 'OK', 200);
+      }
+
       if (wantAutocomplete) {
         try {
           const sugg = await suggestUsers(q, { size: perPage });
@@ -225,7 +257,7 @@ userController.list = async function (req, res) {
           try {
             const sr = await searchUsers(q, { page, perPage });
             hits = sr.results;
-          } catch (e) {}
+          } catch (e) { }
           return res.apiSuccess({ autocomplete: sugg, hits }, 'OK', 200);
         } catch (e) {
           console.warn('Autocomplete failed, fallback to normal search', e.message || e);
@@ -246,7 +278,7 @@ userController.list = async function (req, res) {
       include: {
         roles: true,
         listings: { include: { images: true, category: true } },
-  representatives: true,
+        representatives: true,
         // NotificationRecipient rows for this user, include the notification details
         notifications: { include: { notification: true } },
         auditLogs: true,

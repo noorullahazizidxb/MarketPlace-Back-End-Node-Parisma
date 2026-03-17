@@ -7,8 +7,29 @@ export const blogRepository = {
   async getById(id) {
     return prisma.blog.findUnique({ where: { id }, include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } } });
   },
-  async list() {
-    return prisma.blog.findMany({ orderBy: { createdAt: 'desc' }, include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } } });
+  async list(query) {
+    return prisma.blog.findMany({
+      where: query
+        ? {
+          OR: [
+            { title: { contains: query } },
+            { content: { contains: query } },
+            { author: { fullName: { contains: query } } }
+          ]
+        }
+        : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } }
+    });
+  },
+  async listByIds(ids) {
+    const blogs = await prisma.blog.findMany({
+      where: { id: { in: ids } },
+      include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } }
+    });
+
+    const order = new Map(ids.map((id, index) => [String(id), index]));
+    return blogs.sort((left, right) => (order.get(String(left.id)) ?? 0) - (order.get(String(right.id)) ?? 0));
   },
   async update(id, data) {
     return prisma.blog.update({ where: { id }, data });

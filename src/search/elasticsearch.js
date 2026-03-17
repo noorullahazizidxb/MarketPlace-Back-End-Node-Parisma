@@ -4,7 +4,14 @@ import { logger } from '../utils/logger.js';
 
 let esClient;
 
+export function isElasticEnabled() {
+  return Boolean(config.elastic.enabled);
+}
+
 export function getES() {
+  if (!isElasticEnabled()) {
+    throw new Error('Elasticsearch is disabled');
+  }
   if (!esClient) {
     const base = {
       node: config.elastic.node,
@@ -17,7 +24,7 @@ export function getES() {
     // Allow self-signed certs when explicitly enabled in env.
     if (config.elastic.allowSelfSigned) {
       base.tls = { rejectUnauthorized: false };
-     
+
     }
 
     esClient = new Client(base);
@@ -26,6 +33,7 @@ export function getES() {
 }
 
 export async function initSearch() {
+  if (!isElasticEnabled()) return false;
   const client = getES();
   const index = config.elastic.index;
   const exists = await client.indices.exists({ index });
@@ -56,9 +64,12 @@ export async function initSearch() {
     });
     logger.info({ index }, 'Created Elasticsearch index');
   }
+
+  return true;
 }
 
 export async function initUsersIndex() {
+  if (!isElasticEnabled()) return false;
   const client = getES();
   const index = config.elastic.usersIndex;
   const exists = await client.indices.exists({ index });
@@ -80,7 +91,7 @@ export async function initUsersIndex() {
               type: 'edge_ngram',
               min_gram: 1,
               max_gram: 20,
-              token_chars: ['letter','digit']
+              token_chars: ['letter', 'digit']
             }
           }
         }
@@ -91,7 +102,7 @@ export async function initUsersIndex() {
           email: { type: 'keyword' },
           fullName: { type: 'search_as_you_type' },
           firstName: { type: 'search_as_you_type' },
-            lastName: { type: 'search_as_you_type' },
+          lastName: { type: 'search_as_you_type' },
           fullNameCompletion: { type: 'completion' },
           phone: { type: 'keyword' },
           metadata: { type: 'object', enabled: false },
@@ -101,9 +112,42 @@ export async function initUsersIndex() {
     });
     logger.info({ index }, 'Created Elasticsearch users index');
   }
+
+  return true;
+}
+
+export async function initBlogsIndex() {
+  if (!isElasticEnabled()) return false;
+  const client = getES();
+  const index = config.elastic.blogsIndex;
+  const exists = await client.indices.exists({ index });
+  if (!exists) {
+    await client.indices.create({
+      index,
+      settings: {
+        number_of_shards: 1,
+      },
+      mappings: {
+        properties: {
+          id: { type: 'keyword' },
+          title: { type: 'search_as_you_type' },
+          content: { type: 'text' },
+          authorId: { type: 'keyword' },
+          authorName: { type: 'search_as_you_type' },
+          images: { type: 'keyword' },
+          createdAt: { type: 'date' },
+          updatedAt: { type: 'date' }
+        }
+      }
+    });
+    logger.info({ index }, 'Created Elasticsearch blogs index');
+  }
+
+  return true;
 }
 
 export async function indexUser(user) {
+  if (!isElasticEnabled()) return false;
   const client = getES();
   const index = config.elastic.usersIndex;
   try {
@@ -112,9 +156,12 @@ export async function indexUser(user) {
   } catch (e) {
     logger.warn(e, 'Failed to index user');
   }
+
+  return true;
 }
 
 export async function searchUsers(query, { page = 1, perPage = 50 } = {}) {
+  if (!isElasticEnabled()) throw new Error('Elasticsearch is disabled');
   const client = getES();
   const index = config.elastic.usersIndex;
   const from = (page - 1) * perPage;
@@ -134,6 +181,7 @@ export async function searchUsers(query, { page = 1, perPage = 50 } = {}) {
 }
 
 export async function suggestUsers(prefix, { size = 10 } = {}) {
+  if (!isElasticEnabled()) throw new Error('Elasticsearch is disabled');
   const client = getES();
   const index = config.elastic.usersIndex;
   // Attempt completion suggester first; fallback to bool_prefix on search_as_you_type fields
@@ -186,4 +234,72 @@ export async function suggestUsers(prefix, { size = 10 } = {}) {
       return { prefix, suggestions: [], nextChars: [], strategy: 'none', error: inner.message || String(inner) };
     }
   }
+}
+
+export async function indexBlog(blog) {
+  if (!isElasticEnabled() || !blog?.id) return false;
+  const client = getES();
+  const index = config.elastic.blogsIndex;
+  const document = {
+    id: String(blog.id),
+    title: blog.title,
+    content: blog.content,
+    authorId: String(blog.author?.id || blog.authorId || ''),
+    authorName: blog.author?.fullName || blog.authorName || '',
+    images: Array.isArray(blog.images) ? blog.images : [],
+    createdAt: blog.createdAt,
+    updatedAt: blog.updatedAt,
+  };
+
+  try {
+    await client.index({ index, id: String(blog.id), document });
+    await client.indices.refresh({ index });
+  } catch (e) {
+    logger.warn(e, 'Failed to index blog');
+  }
+
+  return true;
+}
+
+export async function removeBlogFromIndex(blogId) {
+  if (!isElasticEnabled() || !blogId) return false;
+  const client = getES();
+  const index = config.elastic.blogsIndex;
+
+  try {
+    await client.delete({ index, id: String(blogId) }, { ignore: [404] });
+    await client.indices.refresh({ index });
+  } catch (e) {
+    logger.warn(e, 'Failed to remove blog from Elasticsearch');
+  }
+
+  return true;
+}
+
+export async function searchBlogs(query, { page = 1, perPage = 24 } = {}) {
+  if (!isElasticEnabled()) throw new Error('Elasticsearch is disabled');
+
+  const client = getES();
+  const index = config.elastic.blogsIndex;
+  const from = (page - 1) * perPage;
+  const body = {
+    from,
+    size: perPage,
+    query: {
+      multi_match: {
+        query,
+        fields: ['title^4', 'title._2gram^3', 'title._3gram^2', 'content', 'authorName^2'],
+        type: 'best_fields',
+        fuzziness: 'AUTO'
+      }
+    },
+    sort: [{ _score: { order: 'desc' } }, { createdAt: { order: 'desc' } }]
+  };
+
+  const response = await client.search({ index, body });
+  const hits = response.hits?.hits || [];
+  return {
+    total: response.hits?.total?.value || 0,
+    ids: hits.map((hit) => String(hit._id || hit._source?.id)).filter(Boolean),
+  };
 }

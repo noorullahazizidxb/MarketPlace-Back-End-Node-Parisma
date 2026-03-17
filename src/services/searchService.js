@@ -1,8 +1,61 @@
 import { getES } from '../search/elasticsearch.js';
 import { config } from '../config/index.js';
+import { prisma } from '../config/prisma.js';
 
 export const searchService = {
   async search(params) {
+    if (!config.elastic.enabled) {
+      const { q, category, listingType, minPrice, maxPrice, location, page = 1, perPage = 20 } = params;
+      const where = {
+        status: 'APPROVED',
+        ...(category ? { category: { slug: category } } : {}),
+        ...(listingType ? { listingType } : {}),
+        ...(location ? { location: { contains: location } } : {}),
+        ...(minPrice || maxPrice ? {
+          price: {
+            ...(minPrice ? { gte: Number(minPrice) } : {}),
+            ...(maxPrice ? { lte: Number(maxPrice) } : {})
+          }
+        } : {}),
+        ...(q ? {
+          OR: [
+            { title: { contains: q } },
+            { description: { contains: q } },
+            { location: { contains: q } }
+          ]
+        } : {})
+      };
+
+      const [total, listings] = await Promise.all([
+        prisma.listing.count({ where }),
+        prisma.listing.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * perPage,
+          take: perPage,
+          include: { category: true, images: true }
+        })
+      ]);
+
+      return {
+        total,
+        hits: listings.map((listing) => ({
+          id: listing.id,
+          title: listing.title,
+          description: listing.description,
+          category: listing.category?.slug || null,
+          listingType: listing.listingType,
+          status: listing.status,
+          price: Number(listing.price),
+          currency: listing.currency,
+          location: listing.location,
+          createdAt: listing.createdAt,
+          updatedAt: listing.updatedAt,
+          images: listing.images,
+        }))
+      };
+    }
+
     const client = getES();
     const index = config.elastic.index;
     const { q, category, listingType, status, minPrice, maxPrice, location, page = 1, perPage = 20, sortBy = 'createdAt', sortOrder = 'desc' } = params;

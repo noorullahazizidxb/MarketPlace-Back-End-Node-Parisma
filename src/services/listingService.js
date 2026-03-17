@@ -24,10 +24,10 @@ export const listingService = {
       contactVisibility: payload.contactVisibility || 'HIDE_SELLER',
       user: { connect: { id: userId } },
       category: { connect: { id: payload.categoryId } },
-  location: payload.location || null,
-  address: payload.address || null,
-  metadata: payload.metadata !== undefined ? payload.metadata : undefined,
-  expiresAt: expiresAt
+      location: payload.location || null,
+      address: payload.address || null,
+      metadata: payload.metadata !== undefined ? payload.metadata : undefined,
+      expiresAt: expiresAt
     };
 
     const listing = await listingRepository.create(data);
@@ -57,35 +57,37 @@ export const listingService = {
       await prisma.listingImage.createMany({ data: imgs });
     }
 
-    // enqueue a search-index job (will index only after approved; worker will check status)
-    try {
-      const q = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
-      if (typeof q?.add === 'function') {
-        await q.add('index-listing', { listingId: listing.id });
-      } else {
-        logger.warn({ listingId: listing.id }, 'Search index queue not available; skipping enqueue');
+    // enqueue a search-index job only when Elasticsearch is enabled
+    if (config.elastic.enabled) {
+      try {
+        const q = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
+        if (typeof q?.add === 'function') {
+          await q.add('index-listing', { listingId: listing.id });
+        } else {
+          logger.warn({ listingId: listing.id }, 'Search index queue not available; skipping enqueue');
+        }
+      } catch (e) {
+        logger.error(e, 'Failed to enqueue search index job');
       }
-    } catch (e) {
-      logger.error(e, 'Failed to enqueue search index job');
     }
 
-  // reload with relations for response
-  const full = await listingRepository.getById(listing.id);
-  // cache listing detail
-  try { await redisSet(`listing:${full.id}`, full, 60); } catch (e) {}
-  logger.info({ listingId: listing.id }, 'Created listing (pending approval)');
-  return full;
+    // reload with relations for response
+    const full = await listingRepository.getById(listing.id);
+    // cache listing detail
+    try { await redisSet(`listing:${full.id}`, full, 60); } catch (e) { }
+    logger.info({ listingId: listing.id }, 'Created listing (pending approval)');
+    return full;
   },
 
   async getListing(id) {
-  const key = `listing:${id}`;
-  const listing = await cachedResponse(key, async () => await listingRepository.getById(id), 60);
-  if (!listing) return null;
+    const key = `listing:${id}`;
+    const listing = await cachedResponse(key, async () => await listingRepository.getById(id), 60);
+    if (!listing) return null;
     // attach feedback stats
     if (Array.isArray(listing.feedbacks) && listing.feedbacks.length) {
       const ratings = listing.feedbacks.map(f => typeof f.rating === 'number' ? f.rating : null).filter(v => v !== null);
       const count = ratings.length;
-      const avg = count ? (ratings.reduce((a,b)=>a+b,0) / count) : 0;
+      const avg = count ? (ratings.reduce((a, b) => a + b, 0) / count) : 0;
       listing.reviewCount = listing.feedbacks.length;
       listing.averageRating = avg;
     } else {
@@ -93,7 +95,7 @@ export const listingService = {
       listing.averageRating = 0;
     }
     // Return full user info regardless of contactVisibility (per requirement)
-  return listing;
+    return listing;
   },
 
   async approveListing(listingId, adminId, opts = {}) {
@@ -102,7 +104,7 @@ export const listingService = {
     const expiresAt = new Date();
     try {
       expiresAt.setDate(expiresAt.getDate() + (config.retention.renewWindowDays || 0));
-    } catch (e) {}
+    } catch (e) { }
     const data = {
       status: 'APPROVED',
       approvedAt,
@@ -111,7 +113,7 @@ export const listingService = {
       expiresAt
     };
 
-  const listing = await listingRepository.update(listingId, data);
+    const listing = await listingRepository.update(listingId, data);
 
     // If seller is hidden, bind representatives whose region matches listing location
     try {
@@ -129,15 +131,17 @@ export const listingService = {
     }
 
     // push an index job to ensure ES is updated
-    try {
-      const q2 = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
-      if (typeof q2?.add === 'function') {
-        await q2.add('index-listing', { listingId: listing.id, force: true });
-      } else {
-        logger.warn({ listingId: listing.id }, 'Search index queue not available; skipping enqueue');
+    if (config.elastic.enabled) {
+      try {
+        const q2 = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
+        if (typeof q2?.add === 'function') {
+          await q2.add('index-listing', { listingId: listing.id, force: true });
+        } else {
+          logger.warn({ listingId: listing.id }, 'Search index queue not available; skipping enqueue');
+        }
+      } catch (e) {
+        logger.error(e, 'Failed to enqueue search index job on approve');
       }
-    } catch (e) {
-      logger.error(e, 'Failed to enqueue search index job on approve');
     }
 
     // Create a notification record for the owner (lightweight)
@@ -178,12 +182,12 @@ export const listingService = {
       }
     }
 
-  // reload with relations
-  const full = await listingRepository.getById(listing.id);
-  // invalidate cache
-  try { await redisDel(`listing:${full.id}`); } catch (e) {}
-  logger.info({ listingId, adminId }, 'Listing approved');
-  return full;
+    // reload with relations
+    const full = await listingRepository.getById(listing.id);
+    // invalidate cache
+    try { await redisDel(`listing:${full.id}`); } catch (e) { }
+    logger.info({ listingId, adminId }, 'Listing approved');
+    return full;
   }
   ,
   async deleteListing(listingId, actorId, actorIsAdmin = false) {
@@ -206,16 +210,18 @@ export const listingService = {
     const deleted = await listingRepository.delete(listingId);
 
     // invalidate cache
-    try { await redisDel(`listing:${listingId}`); } catch (e) {}
+    try { await redisDel(`listing:${listingId}`); } catch (e) { }
 
     // Optionally enqueue search index/cleanup job - best-effort
-    try {
-      const q = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
-      if (typeof q?.add === 'function') {
-        await q.add('remove-listing', { listingId });
+    if (config.elastic.enabled) {
+      try {
+        const q = queues && QUEUES && queues[QUEUES.SEARCH_INDEX];
+        if (typeof q?.add === 'function') {
+          await q.add('remove-listing', { listingId });
+        }
+      } catch (e) {
+        logger.warn(e, 'Failed to enqueue remove-listing job');
       }
-    } catch (e) {
-      logger.warn(e, 'Failed to enqueue remove-listing job');
     }
 
     logger.info({ listingId, actorId }, 'Listing deleted');
@@ -246,7 +252,7 @@ export const listingService = {
     }
 
     // invalidate cache
-    try { await redisDel(`listing:${listing.id}`); } catch (e) {}
+    try { await redisDel(`listing:${listing.id}`); } catch (e) { }
     logger.info({ listingId, adminId }, 'Listing rejected');
     return listing;
   }

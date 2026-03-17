@@ -9,6 +9,11 @@ async function main() {
   const batchArg = argv.find(a => a.startsWith('--batch='));
   const batchSize = batchArg ? parseInt(batchArg.split('=')[1], 10) : 100;
 
+  if (!config.elastic.enabled) {
+    console.log('Skipping users index initialization because Elasticsearch is disabled.');
+    return;
+  }
+
   try {
     console.log(`Initializing users index "${config.elastic.usersIndex}"...`);
     await initUsersIndex();
@@ -40,7 +45,7 @@ async function main() {
     console.error('Initialization failed', e);
     process.exitCode = 1;
   } finally {
-    try { await prisma.$disconnect(); } catch (e) {}
+    try { await prisma.$disconnect(); } catch (e) { }
   }
 }
 

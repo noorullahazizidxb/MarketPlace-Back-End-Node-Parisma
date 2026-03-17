@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { prisma } from '../config/prisma.js';
 import { storage } from '../utils/storage.js';
 import { config } from '../config/index.js';
+import { indexBlog, removeBlogFromIndex } from '../search/elasticsearch.js';
 
 export const blogController = {
   async create(req, res) {
@@ -12,9 +13,9 @@ export const blogController = {
       // Debug: log body and uploaded files to help diagnose multipart issues
       try {
         logger.debug({ contentType: req.headers['content-type'], bodyKeys: Object.keys(req.body || {}), files: (req.files || []).map(f => ({ fieldname: f.fieldname, originalname: f.originalname, size: f.size })) }, 'Blog create payload received');
-      } catch (e) {}
+      } catch (e) { }
       const payload = { ...req.body };
-      if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) {} }
+      if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) { } }
       const { error, value } = createBlogSchema.validate(payload);
       if (error) {
         // In development, include the received body & files to aid debugging
@@ -25,8 +26,8 @@ export const blogController = {
         return res.apiError(error.message, 400);
       }
       const blog = await blogService.createBlog(value, req.user.id);
-  // debug log for creation
-  logger.info({ blogId: blog.id, authorId: req.user.id }, 'Blog created - controller');
+      // debug log for creation
+      logger.info({ blogId: blog.id, authorId: req.user.id }, 'Blog created - controller');
       // If files uploaded via multipart, persist them to uploads/blogs/{id} and attach URLs
       if (Array.isArray(req.files) && req.files.length) {
         try {
@@ -94,8 +95,15 @@ export const blogController = {
       } catch (e) {
         logger.warn({ err: e?.message }, 'Failed to create notification for blog creation');
       }
-  // Return the fully reloaded blog when available so clients get the same payload as the WS emit
-  return res.apiSuccess(fullBlog || blog, 'Created', 201);
+      if (config.elastic.enabled && fullBlog) {
+        try {
+          await indexBlog(fullBlog);
+        } catch (e) {
+          logger.warn({ err: e?.message, blogId: blog.id }, 'Failed to index blog after creation');
+        }
+      }
+      // Return the fully reloaded blog when available so clients get the same payload as the WS emit
+      return res.apiSuccess(fullBlog || blog, 'Created', 201);
     } catch (e) {
       logger.error(e);
       return res.apiError('Internal Server Error', 500);
@@ -103,7 +111,7 @@ export const blogController = {
   },
   async list(req, res) {
     try {
-      const blogs = await blogService.listBlogs();
+      const blogs = await blogService.listBlogs(req.query.q);
       return res.apiSuccess(blogs, 'OK', 200);
     } catch (e) {
       logger.error(e);
@@ -115,7 +123,7 @@ export const blogController = {
       if (!req.user) return res.apiError('Unauthorized', 401);
       const id = req.params.id;
       const payload = { ...req.body };
-      if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) {} }
+      if (typeof payload.images === 'string') { try { payload.images = JSON.parse(payload.images); } catch (e) { } }
       const { error, value } = updateBlogSchema.validate(payload);
       if (error) return res.apiError(error.message, 400);
       // load existing to get previous images
@@ -160,6 +168,13 @@ export const blogController = {
         logger.info({ id }, 'Emitting blogUpdated');
         getIO().emit('blogUpdated', { id, blog: fullBlog || updated });
       } catch (e) { logger.warn({ err: e?.message }, 'Failed to emit blogUpdated'); }
+      if (config.elastic.enabled && fullBlog) {
+        try {
+          await indexBlog(fullBlog);
+        } catch (e) {
+          logger.warn({ err: e?.message, blogId: id }, 'Failed to reindex updated blog');
+        }
+      }
       return res.apiSuccess(fullBlog || updated, 'Updated', 200);
     } catch (e) {
       logger.error(e);
@@ -183,7 +198,7 @@ export const blogController = {
       try {
         const { getIO } = await import('../websocket/socket.js');
         getIO().emit('newComment', { blogId: id, comment: fullComment || { ...c, author: { id: req.user.id } } });
-      } catch (e) {}
+      } catch (e) { }
       return res.apiSuccess(fullComment || c, 'Created', 201);
     } catch (e) {
       logger.error(e);
@@ -199,7 +214,7 @@ export const blogController = {
       try {
         const { getIO } = await import('../websocket/socket.js');
         getIO().emit('newLike', { blogId: id, likes: b.likes, liked, userId: req.user.id });
-      } catch (e) {}
+      } catch (e) { }
       return res.apiSuccess({ id: b.id, likes: b.likes, liked }, 'OK', 200);
     } catch (e) {
       logger.error(e);
@@ -215,7 +230,7 @@ export const blogController = {
       try {
         const { getIO } = await import('../websocket/socket.js');
         getIO().emit('newShare', { blogId: id, shares: b.shares, shared, userId: req.user.id });
-      } catch (e) {}
+      } catch (e) { }
       return res.apiSuccess({ id: b.id, shares: b.shares, shared }, 'OK', 200);
     } catch (e) {
       logger.error(e);
@@ -236,16 +251,23 @@ export const blogController = {
         await storage.deleteDirectory(`uploads/blogs/${id}`);
         if (Array.isArray(existing.images)) {
           for (const img of existing.images) {
-            try { await storage.deletePath(img); } catch (e) {}
+            try { await storage.deletePath(img); } catch (e) { }
           }
         }
       } catch (e) { logger.warn({ err: e?.message }, 'Failed to delete blog files'); }
       // delete DB row
       await blogService.deleteBlog(id);
+      if (config.elastic.enabled) {
+        try {
+          await removeBlogFromIndex(id);
+        } catch (e) {
+          logger.warn({ err: e?.message, blogId: id }, 'Failed to remove blog from index after delete');
+        }
+      }
       try {
         const { getIO } = await import('../websocket/socket.js');
         getIO().emit('blogDeleted', { id });
-      } catch (e) {}
+      } catch (e) { }
       return res.apiSuccess({ id }, 'Deleted', 200);
     } catch (e) {
       logger.error(e);

@@ -16,6 +16,10 @@ async function checkRedis() {
 }
 
 async function checkES() {
+  if (!config.elastic.enabled) {
+    console.log('Elasticsearch check skipped -> ENABLE-ELASTIC-SEARCH=false');
+    return true;
+  }
   try {
     const es = getES();
     const info = await es.info();

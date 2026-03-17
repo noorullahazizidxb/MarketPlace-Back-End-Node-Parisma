@@ -22,6 +22,10 @@ async function transform(listing) {
 }
 
 async function reindex() {
+  if (!config.elastic.enabled) {
+    console.log('Skipping listings reindex because Elasticsearch is disabled.');
+    process.exit(0);
+  }
   const client = getES();
   const index = config.elastic.index;
   const pageSize = 500;

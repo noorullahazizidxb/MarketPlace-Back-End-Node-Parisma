@@ -1,4 +1,6 @@
 import { blogRepository } from '../repositories/blogRepository.js';
+import { config } from '../config/index.js';
+import { searchBlogs } from '../search/elasticsearch.js';
 
 export const blogService = {
   async createBlog(payload, authorId) {
@@ -18,8 +20,21 @@ export const blogService = {
   async deleteBlog(id) {
     return blogRepository.remove(id);
   },
-  async listBlogs() {
-    return blogRepository.list();
+  async listBlogs(query) {
+    const term = typeof query === 'string' ? query.trim() : '';
+    if (!term) return blogRepository.list();
+
+    if (!config.elastic.enabled) {
+      return blogRepository.list(term);
+    }
+
+    try {
+      const result = await searchBlogs(term);
+      if (!result.ids.length) return [];
+      return blogRepository.listByIds(result.ids);
+    } catch (error) {
+      return blogRepository.list(term);
+    }
   },
   async addComment(blogId, userId, body) {
     return blogRepository.addComment(blogId, userId, body);
