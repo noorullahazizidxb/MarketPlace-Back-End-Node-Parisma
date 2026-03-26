@@ -10,13 +10,18 @@ export const QUEUES = {
   SEARCH_INDEX: 'search-index',
   NOTIFICATION_DISPATCH: 'notification-dispatch',
   RENEWAL_REMINDER: 'renewal-reminder',
-  CONTENT_CLEANUP: 'content-cleanup'
+  CONTENT_CLEANUP: 'content-cleanup',
+  // Previously inactive — now fully scheduled
+  STATUS_CLEANUP: 'status-cleanup',
+  RENEWAL_EXPIRE: 'renewal-cleanup',
+  FEEDBACK_REMINDER: 'feedback-reminder',
+  BLOG_EXPIRY: 'blog-expiry',
 };
 
 const connections = {};
 function getConnection() {
   if (!connections.primary) {
-  const opts = { maxRetriesPerRequest: null, lazyConnect: false };
+    const opts = { maxRetriesPerRequest: null, lazyConnect: false };
     if (config.redisUsername) opts.username = config.redisUsername;
     if (config.redisPassword) opts.password = config.redisPassword;
     connections.primary = config.redisUrl ? new IORedis(config.redisUrl, opts) : new IORedis(opts);

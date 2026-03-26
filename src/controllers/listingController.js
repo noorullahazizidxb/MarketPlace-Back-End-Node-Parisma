@@ -561,5 +561,35 @@ export const listingController = {
       logger.error(e, 'Failed to update visibility/bind reps');
       return res.apiError('Failed', 500);
     }
+  },
+
+  async listAll(req, res) {
+    try {
+      if (!req.user || !req.user.roles?.includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const status = req.query.status || undefined;
+      const q = String(req.query.q || '').trim().toLowerCase();
+      const page = Math.max(1, parseInt(req.query.page || '1', 10));
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '20', 10)));
+      const listings = await prisma.listing.findMany({
+        where: {
+          ...(status ? { status } : {}),
+          ...(q ? {
+            OR: [
+              { title: { contains: q } },
+              { description: { contains: q } },
+              { location: { contains: q } }
+            ]
+          } : {})
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { images: true, user: { select: { id: true, fullName: true, firstName: true, lastName: true, photo: true } }, category: true }
+      });
+      return res.apiSuccess(listings, 'OK', 200);
+    } catch (e) {
+      logger.error(e, 'Failed to list all listings for admin');
+      return res.apiError('Failed', 500);
+    }
   }
 };

@@ -41,16 +41,26 @@ export const config = {
     facebookAppSecret: process.env.FACEBOOK_APP_SECRET,
   },
   retention: {
-    unapprovedDays: parseInt(process.env.UNAPPROVED_RETENTION_DAYS || '2', 10),
-    renewWindowDays: parseInt(process.env.RENEW_WINDOW_DAYS || '14', 10),
-    contentCleanupDays: parseInt(process.env.CONTENT_CLEANUP_DAYS || '30', 10),
-    // Removed: SOLD_RENTED_CLEANUP_DAYS, DRAFT_CLEANUP_DAYS, LISTING_DEFAULT_EXPIRY_DAYS, FEEDBACK_REMINDER_DAYS
-  }
-  ,
+    unapprovedDays: parseInt(process.env.LISTING_UNAPPROVED_DELETE_AFTER_DAYS || process.env.UNAPPROVED_RETENTION_DAYS || '2', 10),
+    renewWindowDays: parseInt(process.env.LISTING_RENEWAL_WINDOW_DAYS || process.env.RENEW_WINDOW_DAYS || '14', 10),
+    contentCleanupDays: parseInt(process.env.BLOG_STORY_KEEP_DAYS || process.env.CONTENT_CLEANUP_DAYS || '30', 10),
+    // Status cleanup (SOLD/RENTED/DRAFT/EXPIRED listings)
+    soldRentedCleanupDays: parseInt(process.env.SOLD_RENTED_CLEANUP_DAYS || '90', 10),
+    draftCleanupDays: parseInt(process.env.DRAFT_CLEANUP_DAYS || '30', 10),
+    // Feedback reminder (days after sold/rented before asking for feedback)
+    feedbackReminderDays: parseInt(process.env.FEEDBACK_REMINDER_DAYS || '7', 10),
+    // Blog expiry settings
+    blogDefaultExpiryDays: parseInt(process.env.BLOG_DEFAULT_EXPIRY_DAYS || '90', 10),
+    blogRenewalNotifyDays: parseInt(process.env.NOTIFY_BLOG_OWNER_TO_RENEW_DAYS || '7', 10),
+  },
   // scheduled times for recurring jobs (HH:mm in 24h)
   schedules: {
-    moderationCleanupTime: process.env.MODERATION_CLEANUP_TIME || '03:00',
-    renewalCleanupTime: process.env.RENEWAL_CLEANUP_TIME || '06:00',
-    contentCleanupTime: process.env.CONTENT_CLEANUP_TIME || '04:00'
+    moderationCleanupTime: process.env.DAILY_LISTING_CLEANUP_TIME || process.env.MODERATION_CLEANUP_TIME || '03:00',
+    renewalCleanupTime: process.env.DAILY_RENEWAL_REMINDER_TIME || process.env.RENEWAL_CLEANUP_TIME || '06:00',
+    contentCleanupTime: process.env.DAILY_BLOG_STORY_CLEANUP_TIME || process.env.CONTENT_CLEANUP_TIME || '04:00',
+    statusCleanupTime: process.env.DAILY_STATUS_CLEANUP_TIME || '02:00',
+    renewalExpireTime: process.env.DAILY_RENEWAL_EXPIRE_TIME || '01:00',
+    feedbackReminderTime: process.env.DAILY_FEEDBACK_REMINDER_TIME || '08:00',
+    blogExpiryCheckTime: process.env.DAILY_BLOG_EXPIRY_CHECK_TIME || '05:00',
   }
 };

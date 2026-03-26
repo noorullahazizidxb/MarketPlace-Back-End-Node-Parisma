@@ -74,6 +74,12 @@ enum ContactSubject {
   partnershipInquiry
 }
 
+enum BlogStatus {
+  PENDING   // awaiting admin review after author submission
+  APPROVED  // visible to the public
+  REJECTED  // hidden; author notified
+}
+
 // --------------------------------------------------
 // Models
 // --------------------------------------------------
@@ -153,7 +159,7 @@ model Listing {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   title             String
-  description       String
+  description       String       @db.Text
   price             Decimal                 @db.Decimal(12, 2)
   currency          String                  @default("AFN")
   listingType       ListingType
@@ -379,23 +385,30 @@ model StoryImage {
 }
 
 model Blog {
-  id        String        @id @default(cuid())
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  title     String
-  content   String        @db.Text
-  images    Json?
-  likes     Int           @default(0)
-  shares    Int           @default(0)
+  id          String        @id @default(cuid())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  title       String
+  content     String        @db.Text
+  images      Json?
+  likes       Int           @default(0)
+  shares      Int           @default(0)
+  // Moderation status: PENDING until admin approves
+  status      BlogStatus    @default(PENDING)
   // Track per-user likes/shares as JSON arrays of user IDs
-  likedBy   Json?
-  sharedBy  Json?
-  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId  String
-  comments  BlogComment[]
+  likedBy     Json?
+  sharedBy    Json?
+  // Expiry: set when approved; daily job notifies owner and deletes when reached
+  expiresAt   DateTime?
+  renewedAt   DateTime?
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId    String
+  comments    BlogComment[]
 
   @@index([authorId])
   @@index([createdAt])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model BlogComment {

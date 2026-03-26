@@ -15,6 +15,8 @@ router.get('/hidden', listingController.listHiddenContact);
 router.get('/pending', requireAuth, listingController.listPending);
 // Real-time approvals: broadcast pending listings to admin clients
 router.get('/for-approval', requireAuth, listingController.forApproval);
+// Admin: list all listings with optional ?status= filter
+router.get('/admin/all', requireAuth, listingController.listAll);
 // Force emit all pending listings to admin sockets (admin only)
 router.post('/for-approval/emit-all', requireAuth, listingController.emitAllForApproval);
 // Create a listing (user) - accept multipart/form-data (files + fields)

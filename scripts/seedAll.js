@@ -981,6 +981,9 @@ async function main() {
         likedBy: [users[(index + 1) % users.length].id, users[(index + 2) % users.length].id],
         sharedBy: [users[(index + 3) % users.length].id],
         authorId: author.id,
+        status: 'APPROVED',
+        expiresAt: new Date(Date.now() + (90 + index * 3) * 24 * 60 * 60 * 1000),
+        renewedAt: index % 5 === 0 ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) : null,
       },
     });
 
@@ -1027,11 +1030,34 @@ async function main() {
     'DETAIL_PAGE_2ND',
     'DETAIL_PAGE_SIDEBAR',
   ];
+  const adCopy = [
+    { title: 'Find Your Next Phone in Kabul — Verified Sellers Only', body: 'Browse hundreds of checked smartphones from trusted sellers across Kabul. Same-day pickup available.' },
+    { title: 'Rent Office Space in Mazar-e-Sharif — No Agent Fees', body: 'Direct listings from property owners in Balkh province. Contact sellers instantly and arrange viewings.' },
+    { title: 'Sell Your Laptop Fast — Free Listing This Week', body: 'Post your used laptop or PC for free and reach buyers in Herat, Kabul, and Jalalabad within hours.' },
+    { title: 'Best Budget Smartphones Under 8,000 AFN', body: 'Discover quality used phones with verified condition reports. IMEI-checked, tested, and ready to pick up.' },
+    { title: 'Premium Furniture Deals — Kabul & Herat Delivery', body: 'Bedroom sets, office desks, and storage solutions from verified home sellers across major cities.' },
+    { title: 'Vehicle Listings Updated Daily — Buy or Rent in Afghanistan', body: 'SUVs, sedans, and motorbikes for sale or rent. Transparent pricing, no hidden costs.' },
+    { title: 'Authentic Afghan Clothing — Direct from Local Designers', body: 'Traditional and modern fashion pieces listed by verified Afghan tailors and boutiques.' },
+    { title: 'Books at Half Price — Students Welcome', body: 'Academic, professional, and general interest books from sellers near universities and schools.' },
+    { title: 'List Your Business Products — Reach 20,000+ Buyers', body: 'Join thousands of Afghan sellers who grew their reach with Marketplace listings.' },
+    { title: 'Electronics Trade-In Program — Upgrade for Less', body: 'Trade your old device toward a newer model. Participating sellers in Kabul, Herat, and Kunduz.' },
+    { title: 'Beauty & Skincare — Sealed Stock, Verified Brands', body: 'Discover genuine beauty products with expiry verification and brand authenticity guarantee.' },
+    { title: 'House for Sale in Parwan — Flexible Payment Terms', body: 'Well-maintained residential properties with clear documentation and negotiable payment plans.' },
+    { title: 'Post Your Job Ad — Hire Local Talent Across Provinces', body: 'Reach skilled professionals in your city or province. Listings go live within one business day.' },
+    { title: 'Audio Equipment Deals — Headphones, Speakers & More', body: 'Shop verified audio gear from trusted sellers. Tested and condition-rated before listing.' },
+    { title: 'Office Supplies Priced to Clear — Kabul Stock', body: 'Desks, chairs, and stationery from office liquidations. Contact sellers for bulk pricing.' },
+    { title: 'Gaming Laptops — Benchmarks Verified by Sellers', body: 'High-performance laptops with GPU/CPU specs confirmed. In-person testing available before purchase.' },
+    { title: 'Groceries & Daily Essentials — Local Supplier Listings', body: 'Connect directly with wholesalers and small suppliers in your province for regular orders.' },
+    { title: "Children's Clothing — New Season Stock in Kabul", body: 'Ages 1–14, sized and labeled. New and like-new condition from verified children\'s wear sellers.' },
+    { title: 'Camera & Photography Equipment — Ready to Shoot', body: 'DSLRs, mirrorless cameras, lenses, and accessories from photographers upgrading their kits.' },
+    { title: 'Register Your Shop — Free Premium Account for July', body: 'Get your business profile verified and listed across all major categories at no cost this month.' },
+  ];
   for (let index = 0; index < 20; index += 1) {
+    const ad = adCopy[index % adCopy.length];
     await prisma.ad.create({
       data: {
-        title: `Marketplace campaign ${index + 1}`,
-        body: `Featured marketplace campaign for ${listingSeed[index % listingSeed.length].title}.`,
+        title: ad.title,
+        body: ad.body,
         imageUrl: adImageUrls[index % adImageUrls.length],
         placement: placements[index % placements.length],
         isActive: index < 6,

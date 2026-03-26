@@ -64,7 +64,7 @@ CREATE TABLE `Listing` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `title` VARCHAR(191) NOT NULL,
-    `description` VARCHAR(191) NOT NULL,
+    `description` TEXT NOT NULL,
     `price` DECIMAL(12, 2) NOT NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'AFN',
     `listingType` ENUM('RENT', 'SALE') NOT NULL,
@@ -294,12 +294,17 @@ CREATE TABLE `Blog` (
     `images` JSON NULL,
     `likes` INTEGER NOT NULL DEFAULT 0,
     `shares` INTEGER NOT NULL DEFAULT 0,
+    `status` ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
     `likedBy` JSON NULL,
     `sharedBy` JSON NULL,
+    `expiresAt` DATETIME(3) NULL,
+    `renewedAt` DATETIME(3) NULL,
     `authorId` VARCHAR(191) NOT NULL,
 
     INDEX `Blog_authorId_idx`(`authorId`),
     INDEX `Blog_createdAt_idx`(`createdAt`),
+    INDEX `Blog_status_idx`(`status`),
+    INDEX `Blog_expiresAt_idx`(`expiresAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

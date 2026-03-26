@@ -64,7 +64,7 @@ export const blogController = {
       } catch (e) {
         logger.warn({ err: e?.message, blogId: blog.id }, 'Failed to reload blog after image persistence');
       }
-      // Emit blogCreated for live updates (best-effort) using fullBlog when available
+      // Emit blogCreated for general live updates (best-effort)
       try {
         const { getIO } = await import('../websocket/socket.js');
         logger.info({ blogId: blog.id }, 'Emitting blogCreated');
@@ -72,12 +72,20 @@ export const blogController = {
       } catch (e) {
         logger.warn({ err: e?.message }, 'Failed to emit blogCreated');
       }
-      // Create a system notification to inform the author their blog was posted
+      // Emit pending-blog:new to the admin approvals room so admins see it immediately
+      try {
+        const { emitToApprovals } = await import('../websocket/socket.js');
+        emitToApprovals('pending-blog:new', fullBlog || blog);
+        logger.info({ blogId: blog.id }, 'Emitted pending-blog:new to approvals room');
+      } catch (e) {
+        logger.warn({ err: e?.message }, 'Failed to emit pending-blog:new');
+      }
+      // Create a system notification to inform the author their blog is pending review
       try {
         const note = await prisma.notification.create({
           data: {
-            title: 'Blog published',
-            message: `Your blog "${(fullBlog || blog).title}" was published.`,
+            title: 'Blog submitted for review',
+            message: `Your blog "${(fullBlog || blog).title}" was submitted and is pending admin review.`,
             channel: 'SYSTEM',
             targetType: 'USER',
             senderId: req.user.id,
@@ -269,6 +277,130 @@ export const blogController = {
         getIO().emit('blogDeleted', { id });
       } catch (e) { }
       return res.apiSuccess({ id }, 'Deleted', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError('Failed', 500);
+    }
+  },
+
+  async listPending(req, res) {
+    try {
+      if (!req.user || !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const blogs = await blogService.listPendingBlogs();
+      return res.apiSuccess(blogs, 'OK', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError('Failed', 500);
+    }
+  },
+
+  async emitAllPendingBlogs(req, res) {
+    try {
+      if (!req.user || !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const blogs = await blogService.listPendingBlogs();
+      try {
+        const { emitToApprovals } = await import('../websocket/socket.js');
+        emitToApprovals('pending-blogs', blogs);
+      } catch (e) { }
+      return res.apiSuccess({ emitted: blogs.length }, 'Emitted', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError('Failed', 500);
+    }
+  },
+
+  async approve(req, res) {
+    try {
+      if (!req.user || !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const id = req.params.id;
+      const blog = await blogService.approveBlog(id);
+      // Notify the author
+      try {
+        const { emitToUser } = await import('../websocket/socket.js');
+        emitToUser(blog.authorId, 'notification:new', { type: 'BLOG_APPROVED', blogId: id, title: blog.title });
+        await prisma.notification.create({
+          data: {
+            title: 'Blog approved',
+            message: `Your blog "${blog.title}" was approved and is now live.`,
+            channel: 'SYSTEM',
+            targetType: 'USER',
+            triggerEvent: 'BLOG_APPROVED',
+            recipients: { create: [{ userId: blog.authorId }] }
+          }
+        });
+      } catch (e) { logger.warn({ err: e?.message }, 'Failed to notify author on blog approval'); }
+      // Broadcast updated blog so public lists refresh
+      try {
+        const { getIO } = await import('../websocket/socket.js');
+        getIO().emit('blogUpdated', { blog });
+      } catch (e) { }
+      return res.apiSuccess(blog, 'Approved', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError(e.message === 'Not found' ? 'Not found' : 'Failed', e.message === 'Not found' ? 404 : 500);
+    }
+  },
+
+  async reject(req, res) {
+    try {
+      if (!req.user || !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const id = req.params.id;
+      const blog = await blogService.rejectBlog(id);
+      // Notify the author
+      try {
+        const { emitToUser } = await import('../websocket/socket.js');
+        emitToUser(blog.authorId, 'notification:new', { type: 'BLOG_REJECTED', blogId: id, title: blog.title });
+        await prisma.notification.create({
+          data: {
+            title: 'Blog rejected',
+            message: `Your blog "${blog.title}" was rejected by an admin.`,
+            channel: 'SYSTEM',
+            targetType: 'USER',
+            triggerEvent: 'BLOG_REJECTED',
+            recipients: { create: [{ userId: blog.authorId }] }
+          }
+        });
+      } catch (e) { logger.warn({ err: e?.message }, 'Failed to notify author on blog rejection'); }
+      return res.apiSuccess({ id }, 'Rejected', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError(e.message === 'Not found' ? 'Not found' : 'Failed', e.message === 'Not found' ? 404 : 500);
+    }
+  },
+
+  async renew(req, res) {
+    try {
+      if (!req.user) return res.apiError('Unauthorized', 401);
+      const id = req.params.id;
+      const blog = await blogService.renewBlog(id, req.user.id);
+      return res.apiSuccess(blog, 'Renewed', 200);
+    } catch (e) {
+      logger.error(e);
+      const status = e.status || (e.message === 'Not found' ? 404 : e.message === 'Forbidden' ? 403 : 500);
+      return res.apiError(e.message || 'Failed', status);
+    }
+  },
+
+  async get(req, res) {
+    try {
+      const blog = await blogService.getById(req.params.id);
+      if (!blog) return res.apiError('Not found', 404);
+      return res.apiSuccess(blog, 'OK', 200);
+    } catch (e) {
+      logger.error(e);
+      return res.apiError('Failed', 500);
+    }
+  },
+
+  async listAll(req, res) {
+    try {
+      if (!req.user || !(req.user.roles || []).includes('ADMIN')) return res.apiError('Forbidden', 403);
+      const status = req.query.status || undefined;
+      const q = String(req.query.q || '').trim();
+      const page = Math.max(1, parseInt(req.query.page || '1', 10));
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '20', 10)));
+      const blogs = await blogService.listAll({ status, q, page, limit });
+      return res.apiSuccess(blogs, 'OK', 200);
     } catch (e) {
       logger.error(e);
       return res.apiError('Failed', 500);

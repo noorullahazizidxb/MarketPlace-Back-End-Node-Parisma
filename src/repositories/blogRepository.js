@@ -1,31 +1,65 @@
 import { prisma } from '../config/prisma.js';
 
+const blogInclude = {
+  comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } },
+  author: { select: { id: true, fullName: true, photo: true } }
+};
+
 export const blogRepository = {
   async create(data) {
     return prisma.blog.create({ data });
   },
   async getById(id) {
-    return prisma.blog.findUnique({ where: { id }, include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } } });
+    return prisma.blog.findUnique({ where: { id }, include: blogInclude });
   },
   async list(query) {
     return prisma.blog.findMany({
-      where: query
-        ? {
+      where: {
+        status: 'APPROVED',
+        ...(query ? {
           OR: [
             { title: { contains: query } },
             { content: { contains: query } },
             { author: { fullName: { contains: query } } }
           ]
-        }
-        : undefined,
+        } : {})
+      },
       orderBy: { createdAt: 'desc' },
-      include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } }
+      include: blogInclude
     });
+  },
+  async listPending() {
+    return prisma.blog.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      include: blogInclude
+    });
+  },
+  async listAll({ status, q, page = 1, limit = 20 } = {}) {
+    const where = {};
+    if (status) where.status = status;
+    if (q) {
+      where.OR = [
+        { title: { contains: q } },
+        { content: { contains: q } },
+        { author: { fullName: { contains: q } } }
+      ];
+    }
+    return prisma.blog.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: blogInclude
+    });
+  },
+  async setStatus(id, status, extra = {}) {
+    return prisma.blog.update({ where: { id }, data: { status, ...extra } });
   },
   async listByIds(ids) {
     const blogs = await prisma.blog.findMany({
-      where: { id: { in: ids } },
-      include: { comments: { include: { author: { select: { id: true, fullName: true, photo: true } } } }, author: { select: { id: true, fullName: true, photo: true } } }
+      where: { id: { in: ids }, status: 'APPROVED' },
+      include: blogInclude
     });
 
     const order = new Map(ids.map((id, index) => [String(id), index]));

@@ -19,6 +19,10 @@ import './workers/moderationWorker.js';
 import './workers/notificationWorker.js';
 import './workers/renewalReminderWorker.js';
 import './workers/contentCleanupWorker.js';
+import './workers/statusCleanupWorker.js';
+import './workers/renewalCleanupWorker.js';
+import './workers/feedbackWorker.js';
+import './workers/blogExpiryWorker.js';
 
 const app = express();
 import http from 'http';
