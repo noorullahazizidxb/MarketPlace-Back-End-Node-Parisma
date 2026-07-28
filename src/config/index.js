@@ -25,7 +25,7 @@ export const config = {
   elastic: {
     enabled: parseBoolean(readEnv('ENABLE-ELASTIC-SEARCH', 'ENABLE_ELASTIC_SEARCH'), true),
     node: process.env.ELASTICSEARCH_NODE || 'https://localhost:9200',
-    username: process.env.ELASTICSEARCH_USERNAME || 'elastic',
+    username: process.env.ELASTICSEARCH_USERNAME || '',
     password: process.env.ELASTICSEARCH_PASSWORD,
     index: process.env.ELASTICSEARCH_INDEX || 'listings',
     usersIndex: process.env.ELASTICSEARCH_USERS_INDEX || 'users',
