@@ -11,7 +11,7 @@
     "migrate": "prisma migrate dev",
     "generate": "prisma generate",
     "postinstall": "prisma generate",
-    "lint": "eslint . --ext .js",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "reindex:all": "node scripts/reindex-search.js",
     "reindex:blogs": "node scripts/reindex-blogs.js",
@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.13.0",
-    "@prisma/client": "latest",
+    "@prisma/client": "6.19.3",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
@@ -37,14 +37,14 @@
     "ioredis": "^5.4.1",
     "joi": "^17.12.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "2.2.0",
     "mysql2": "^3.11.0",
     "nanoid": "^5.1.5",
-    "nodemailer": "^6.9.3",
+    "nodemailer": "9.0.3",
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
     "rate-limit-redis": "^4.2.2",
-    "sharp": "^0.33.5",
+    "sharp": "0.35.3",
     "socket.io": "^4.8.1",
     "twilio": "^4.9.0"
   },
@@ -53,11 +53,17 @@
     "lru-cache": "^10.4.3"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.29.1",
-    "nodemon": "^3.1.0",
-    "prettier": "^3.2.5",
-    "prisma": "latest"
+    "@eslint/js": "9.39.5",
+    "brace-expansion": "file:vendor/brace-expansion-compat",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "globals": "17.8.0",
+    "nodemon": "3.1.14",
+    "prettier": "3.9.6",
+    "prisma": "6.19.3"
+  },
+  "overrides": {
+    "brace-expansion": "$brace-expansion"
   }
 }
