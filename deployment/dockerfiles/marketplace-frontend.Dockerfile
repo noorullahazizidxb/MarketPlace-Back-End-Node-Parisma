@@ -3,9 +3,10 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY vendor ./vendor
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
@@ -40,7 +41,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
