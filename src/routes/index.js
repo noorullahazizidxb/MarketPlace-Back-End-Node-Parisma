@@ -9,7 +9,6 @@ import rolesRouter from './roles.js';
 import adminRouter from './admin.js';
 import listingImagesRouter from './listingImages.js';
 import userRouter from './users.js';
-import themesRouter from './themes.js';
 import notificationsRouter from './notifications.js';
 import listingFeedbacksRouter from './listingFeedbacks.js';
 import adsRouter from './ads.js';
@@ -36,7 +35,6 @@ export function registerRoutes(app, upload) {
   api.use('/admin', (req, res, next) => { res.locals.entityName = 'Admin'; next(); }, adminRouter);
   api.use('/listings', (req, res, next) => { res.locals.entityName = 'ListingImages'; next(); }, listingImagesRouter);
   api.use('/users', (req, res, next) => { res.locals.entityName = 'User'; next(); }, userRouter);
-  api.use('/themes', (req, res, next) => { res.locals.entityName = 'Themes'; next(); }, themesRouter);
   api.use('/feedbacks', (req, res, next) => { res.locals.entityName = 'ListingFeedback'; next(); }, listingFeedbacksRouter);
   api.use('/ads', (req, res, next) => { res.locals.entityName = 'Ad'; next(); }, adsRouter);
   api.use('/stories', (req, res, next) => { res.locals.entityName = 'Story'; next(); }, storiesRouter);

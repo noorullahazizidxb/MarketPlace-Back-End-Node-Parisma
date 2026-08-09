@@ -12,13 +12,6 @@ const backendRoot = process.cwd();
 const uploadsRoot = path.resolve(backendRoot, 'uploads');
 const listingImageDir = path.resolve(backendRoot, 'dummydata', 'images');
 const profileImageDir = path.resolve(backendRoot, 'dummydata', 'UserProfileImages');
-const frontendDefaultThemePath = path.resolve(
-  backendRoot,
-  '..',
-  'marketplace-Front-end',
-  'theme-data',
-  'default-theme.json'
-);
 const defaultPassword = process.env.SEED_USER_PASSWORD || 'MarketPlace@2026';
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@marketplace.example.com';
 const adminPhone = process.env.ADMIN_PHONE || '+93700000001';
@@ -521,29 +514,6 @@ const contactMessages = [
   'Can the admin team review my product descriptions for compliance before publishing?',
 ];
 
-const themeVariants = [
-  { name: 'Kabul Dawn', lightAccent: [206, 68, 58], darkAccent: [206, 70, 48] },
-  { name: 'Herat Clay', lightAccent: [24, 62, 58], darkAccent: [24, 66, 46] },
-  { name: 'Mazar Sky', lightAccent: [198, 60, 62], darkAccent: [198, 63, 48] },
-  { name: 'Kandahar Sand', lightAccent: [34, 58, 61], darkAccent: [34, 60, 45] },
-  { name: 'Panjshir Pine', lightAccent: [154, 38, 52], darkAccent: [154, 42, 38] },
-  { name: 'Bamyan Stone', lightAccent: [210, 18, 64], darkAccent: [210, 20, 42] },
-  { name: 'Badakhshan Sapphire', lightAccent: [222, 66, 56], darkAccent: [222, 70, 44] },
-  { name: 'Jalalabad Citrus', lightAccent: [46, 78, 58], darkAccent: [46, 82, 44] },
-  { name: 'Gardez Copper', lightAccent: [18, 56, 57], darkAccent: [18, 60, 43] },
-  { name: 'Khost Cedar', lightAccent: [138, 34, 54], darkAccent: [138, 38, 38] },
-  { name: 'Charikar Fog', lightAccent: [214, 24, 68], darkAccent: [214, 26, 44] },
-  { name: 'Fayzabad Indigo', lightAccent: [238, 48, 60], darkAccent: [238, 52, 42] },
-  { name: 'Mehtarlam Olive', lightAccent: [80, 34, 56], darkAccent: [80, 38, 40] },
-  { name: 'Maimana Orchard', lightAccent: [112, 42, 58], darkAccent: [112, 45, 40] },
-  { name: 'Nili Horizon', lightAccent: [196, 30, 60], darkAccent: [196, 34, 42] },
-  { name: 'Pul-e Khumri Slate', lightAccent: [218, 16, 58], darkAccent: [218, 18, 38] },
-  { name: 'Samangan Rose', lightAccent: [344, 58, 66], darkAccent: [344, 60, 46] },
-  { name: 'Taloqan Mint', lightAccent: [166, 42, 60], darkAccent: [166, 46, 42] },
-  { name: 'Kunduz Brick', lightAccent: [12, 54, 58], darkAccent: [12, 58, 42] },
-  { name: 'Lashkar Gah Night', lightAccent: [230, 34, 56], darkAccent: [230, 38, 34] },
-];
-
 const adImageUrls = [
   'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1600&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1600&auto=format&fit=crop',
@@ -565,46 +535,6 @@ function roleForIndex(index) {
   if (index === 0) return 'ADMIN';
   if (index < 5) return 'REPRESENTATIVE';
   return 'USER';
-}
-
-function hslToHex(hue, saturation, lightness) {
-  const s = saturation / 100;
-  const l = lightness / 100;
-  const chroma = (1 - Math.abs(2 * l - 1)) * s;
-  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const match = l - chroma / 2;
-  let red = 0;
-  let green = 0;
-  let blue = 0;
-
-  if (hue < 60) {
-    [red, green, blue] = [chroma, x, 0];
-  } else if (hue < 120) {
-    [red, green, blue] = [x, chroma, 0];
-  } else if (hue < 180) {
-    [red, green, blue] = [0, chroma, x];
-  } else if (hue < 240) {
-    [red, green, blue] = [0, x, chroma];
-  } else if (hue < 300) {
-    [red, green, blue] = [x, 0, chroma];
-  } else {
-    [red, green, blue] = [chroma, 0, x];
-  }
-
-  const toHex = (value) => {
-    const channel = Math.round((value + match) * 255);
-    return channel.toString(16).padStart(2, '0');
-  };
-
-  return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
-}
-
-function colorToken(hue, saturation, lightness) {
-  return {
-    css: `hsl(${hue} ${saturation}% ${lightness}%)`,
-    hex: hslToHex(hue, saturation, lightness),
-    hsl: [hue, saturation, lightness],
-  };
 }
 
 function locationLabel(location) {
@@ -654,27 +584,6 @@ async function copyProfileImage(userId, fileName) {
   return `/uploads/users/${destinationName}`;
 }
 
-async function loadThemeTemplate() {
-  const source = await fs.readFile(frontendDefaultThemePath, 'utf8');
-  return JSON.parse(source);
-}
-
-function makeThemePayload(baseTheme, variant, index) {
-  const theme = JSON.parse(JSON.stringify(baseTheme));
-  theme.id = index + 1;
-  theme.name = variant.name;
-  if (theme.tokens?.light) {
-    theme.tokens.light.accent = colorToken(...variant.lightAccent);
-    theme.tokens.light.linkBg = colorToken(variant.lightAccent[0], variant.lightAccent[1], Math.max(variant.lightAccent[2] - 8, 35));
-  }
-  if (theme.tokens?.dark) {
-    theme.tokens.dark.accent = colorToken(...variant.darkAccent);
-    theme.tokens.dark.linkBg = colorToken(variant.darkAccent[0], variant.darkAccent[1], Math.max(variant.darkAccent[2] - 6, 28));
-  }
-  theme.preferredColorMode = 'HEX';
-  return theme;
-}
-
 async function cleanupExistingData() {
   await prisma.storyImage.deleteMany();
   await prisma.story.deleteMany();
@@ -693,7 +602,6 @@ async function cleanupExistingData() {
   await prisma.auditLog.deleteMany();
   await prisma.jobRecord.deleteMany();
   await prisma.ad.deleteMany();
-  await prisma.themes.deleteMany();
   await prisma.category.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.user.deleteMany();
@@ -725,7 +633,6 @@ async function main() {
 
   const passwordHash = await hashPassword(defaultPassword);
   const profileImages = await sortedFiles(profileImageDir);
-  const themeTemplate = await loadThemeTemplate();
 
   const users = [];
   const representatives = [];
@@ -1065,17 +972,6 @@ async function main() {
     });
   }
 
-  for (let index = 0; index < themeVariants.length; index += 1) {
-    const variant = themeVariants[index];
-    await prisma.themes.create({
-      data: {
-        name: variant.name,
-        tokens: makeThemePayload(themeTemplate, variant, index),
-        isActive: index === 0,
-      },
-    });
-  }
-
   console.log('Seed summary:');
   console.log(`  Users: ${users.length}`);
   console.log(`  Categories: ${categorySeed.length}`);
@@ -1083,7 +979,6 @@ async function main() {
   console.log(`  Stories: ${listings.length}`);
   console.log(`  Blogs: ${blogSeed.length}`);
   console.log(`  Contacts: ${contactMessages.length}`);
-  console.log(`  Themes: ${themeVariants.length}`);
   console.log(`  Ads: 20`);
   console.log(`  Default password for seeded accounts: ${defaultPassword}`);
   console.log(`  Admin email: ${adminEmail}`);

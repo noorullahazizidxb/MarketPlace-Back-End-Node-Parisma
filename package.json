@@ -18,7 +18,11 @@
     "init:users-index": "node scripts/initUsersIndex.js",
     "seed:all": "node scripts/seedAll.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "check:services": "node -r dotenv/config scripts/checkServices.js"
+    "check:services": "node -r dotenv/config scripts/checkServices.js",
+    "deploy": "bash ./deployment/deploy.sh ./deployment/.env",
+    "fresh-deployment": "bash ./deployment/fresh-deployment.sh ./deployment/.env",
+    "deploy:ps": "powershell -ExecutionPolicy Bypass -File ./deployment/deploy.ps1 -EnvFile ./deployment/.env",
+    "fresh-deployment:ps": "powershell -ExecutionPolicy Bypass -File ./deployment/fresh-deployment.ps1 -EnvFile ./deployment/.env"
   },
   "engines": {
     "node": ">=18.0.0"

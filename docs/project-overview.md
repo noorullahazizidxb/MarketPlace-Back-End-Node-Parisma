@@ -83,7 +83,7 @@ The application is a **single Express process** that:
 ## 2. Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+| ------- | ----------- |
 | Runtime | Node.js 18+ with ES Modules (`"type": "module"`) |
 | HTTP Framework | Express 5 |
 | ORM | Prisma (MySQL) |
@@ -178,7 +178,7 @@ src/
 ### Core
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `NODE_ENV` | `development` | Runtime environment |
 | `PORT` | `4000` | HTTP server port |
 | `DATABASE_URL` | — | Prisma MySQL connection string |
@@ -186,7 +186,7 @@ src/
 ### Redis / BullMQ
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `REDIS_USERNAME` | `` | Redis ACL username |
 | `REDIS_PASSWORD` | `` | Redis password |
@@ -194,7 +194,7 @@ src/
 ### Auth
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `TOKEN_SECRET` | `dev_secret` | JWT signing secret |
 | `GOOGLE_CLIENT_ID` | — | Google OAuth2 client ID |
 | `FACEBOOK_APP_ID` | — | Facebook App ID |
@@ -203,7 +203,7 @@ src/
 ### Elasticsearch
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `ENABLE_ELASTIC_SEARCH` | `true` | Enable/disable Elasticsearch (`false` = DB-only search) |
 | `ELASTICSEARCH_NODE` | `https://localhost:9200` | Elasticsearch host |
 | `ELASTICSEARCH_USERNAME` | `elastic` | ES username |
@@ -216,7 +216,7 @@ src/
 ### Retention / Cleanup Days
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `LISTING_UNAPPROVED_DELETE_AFTER_DAYS` | `2` | Days before unapproved (PENDING) listings are deleted |
 | `LISTING_RENEWAL_WINDOW_DAYS` | `14` | Days before expiry to send renewal reminder to listing owner |
 | `BLOG_STORY_KEEP_DAYS` | `30` | Days approved blogs/stories are retained (content cleanup) |
@@ -229,7 +229,7 @@ src/
 ### Scheduled Job Times (HH:mm 24h)
 
 | Variable | Default | Queue |
-|----------|---------|-------|
+| ---------- | --------- | ------- |
 | `DAILY_RENEWAL_EXPIRE_TIME` | `01:00` | `renewal-cleanup` |
 | `DAILY_STATUS_CLEANUP_TIME` | `02:00` | `status-cleanup` |
 | `DAILY_LISTING_CLEANUP_TIME` | `03:00` | `moderation-cleanup` |
@@ -247,7 +247,7 @@ All routes are prefixed with `/api`.
 ### Auth — `/api/auth`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | POST | `/register` | – | Register new user (email + password) |
 | POST | `/login` | – | Login; returns JWT |
 | POST | `/google` | – | Google OAuth2 sign-in |
@@ -259,7 +259,7 @@ All routes are prefixed with `/api`.
 ### Listings — `/api/listings`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | GET | `/` | – | List all APPROVED listings (public), supports `?q=` |
 | GET | `/hidden` | – | List APPROVED listings with hidden seller contact |
 | GET | `/pending` | ✓ | List PENDING listings (admin) |
@@ -278,7 +278,7 @@ All routes are prefixed with `/api`.
 ### Blogs — `/api/blogs`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | GET | `/` | – | List APPROVED blogs (public), supports `?q=` search |
 | GET | `/pending` | ✓ Admin | List PENDING blogs |
 | GET | `/admin/all` | ✓ Admin | All blogs with `?status=&q=&page=&limit=` |
@@ -297,7 +297,7 @@ All routes are prefixed with `/api`.
 ### Categories — `/api/categories`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | GET | `/` | – | List all categories |
 | POST | `/` | ✓ Admin | Create category |
 | PUT | `/:id` | ✓ Admin | Update category |
@@ -306,7 +306,7 @@ All routes are prefixed with `/api`.
 ### Users — `/api/users`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | GET | `/` | ✓ Admin | List all users (admin) |
 | GET | `/:id` | ✓ | Get user profile |
 | PUT | `/:id` | ✓ | Update user profile |
@@ -315,7 +315,7 @@ All routes are prefixed with `/api`.
 ### Notifications — `/api/notifications`
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| -------- | ------ | ------ | ------------- |
 | GET | `/` | ✓ | List notifications for current user |
 | PATCH | `/:id/read` | ✓ | Mark notification as read |
 | PATCH | `/read-all` | ✓ | Mark all notifications read |
@@ -336,14 +336,13 @@ All routes are prefixed with `/api`.
 ### Other Routes
 
 | Base | Description |
-|------|-------------|
+| ------ | ------------- |
 | `/api/renew` | Listing renewal endpoints |
 | `/api/roles` | Role management (admin) |
 | `/api/search` | Full-text search (Elasticsearch / DB fallback) |
 | `/api/ads` | Advertisement management |
 | `/api/stories` | Stories management |
 | `/api/contacts` | Contact form submissions |
-| `/api/themes` | UI theme management |
 | `/api/representatives` | Sales representative directory |
 
 ### Health
@@ -363,7 +362,7 @@ Controllers are thin request/response handlers. They:
 3. Return a standardized API response via `res.apiSuccess()` or `res.apiError()`
 
 | Controller | Key Methods |
-|-----------|-------------|
+| ----------- | ------------- |
 | `authController` | `register`, `login`, `googleAuth`, `facebookAuth`, `me`, `changePassword` |
 | `listingController` | `create`, `get`, `listApproved`, `listPending`, `listAll`, `approve`, `reject`, `delete`, `update`, `patch` |
 | `blogController` | `create`, `get`, `list`, `listPending`, `listAll`, `approve`, `reject`, `renew`, `delete`, `update`, `comment`, `like`, `share` |
@@ -390,7 +389,7 @@ Controller  →  Service  →  Repository  →  Prisma/DB
 ### Key Services
 
 | Service | Responsibility |
-|---------|---------------|
+| --------- | --------------- |
 | `listingService` | Create/update/delete listings; approve/reject with notifications and WS emit; expiry logic |
 | `blogService` | Create/update/delete blogs; approve (sets `expiresAt`); reject; renew; `listAll` for admin |
 | `authService` | Registration, login, password hashing, JWT generation |
@@ -399,7 +398,7 @@ Controller  →  Service  →  Repository  →  Prisma/DB
 ### Key Repositories
 
 | Repository | Methods |
-|-----------|---------|
+| ----------- | --------- |
 | `listingRepository` | `create`, `getById`, `update`, `delete`, `list(filters, opts)`, `findUnapprovedOlderThan` |
 | `blogRepository` | `create`, `getById`, `list`, `listPending`, `listAll`, `listByIds`, `setStatus(id, status, extra)`, `update`, `addComment`, `toggleLike`, `toggleShare` |
 
@@ -510,7 +509,7 @@ All workers are BullMQ `Worker` instances. They are imported (and therefore inst
 `src/schedulers/cron.js` calls `scheduleRecurringJobs()` at startup. Each job is a BullMQ **repeatable job**. The schedule is expressed as a daily CRON where the time comes from config.
 
 | Job Name | Queue | Default Time | Config Key |
-|----------|-------|-------------|------------|
+| ---------- | ------- | ------------- | ------------ |
 | `daily-renewal-expire` | `renewal-cleanup` | 01:00 | `DAILY_RENEWAL_EXPIRE_TIME` |
 | `daily-status-cleanup` | `status-cleanup` | 02:00 | `DAILY_STATUS_CLEANUP_TIME` |
 | `daily-moderation-cleanup` | `moderation-cleanup` | 03:00 | `DAILY_LISTING_CLEANUP_TIME` |
@@ -565,7 +564,7 @@ emitToUser(userId, event, data)  // → broadcasts to "user:{userId}" room
 ### Events Emitted to Admin (`approvals` room)
 
 | Event | Payload | Trigger |
-|-------|---------|---------|
+| ------- | --------- | --------- |
 | `pending-listing:new` | listing object | New listing created |
 | `listing:approved` | `{ id }` | Listing approved |
 | `listing:rejected` | `{ id }` | Listing rejected |
@@ -577,7 +576,7 @@ emitToUser(userId, event, data)  // → broadcasts to "user:{userId}" room
 ### Events Emitted to User (`user:{userId}` room)
 
 | Event | Payload | Trigger |
-|-------|---------|---------|
+| ------- | --------- | --------- |
 | `notification` | notification object | Any SYSTEM / action notification |
 | `listing:approved` | `{ id, title }` | User's listing approved |
 | `listing:rejected` | `{ id, title }` | User's listing rejected |

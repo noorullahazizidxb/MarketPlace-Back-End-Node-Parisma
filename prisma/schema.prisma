@@ -75,9 +75,9 @@ enum ContactSubject {
 }
 
 enum BlogStatus {
-  PENDING   // awaiting admin review after author submission
-  APPROVED  // visible to the public
-  REJECTED  // hidden; author notified
+  PENDING // awaiting admin review after author submission
+  APPROVED // visible to the public
+  REJECTED // hidden; author notified
 }
 
 // --------------------------------------------------
@@ -95,7 +95,7 @@ model User {
   fullName          String?
   contacts          Json?
   address           Json?
-  metadata          Json?         // arbitrary profile / preference data
+  metadata          Json? // arbitrary profile / preference data
   // Followers: store as JSON array of User IDs (strings). MySQL doesn't support array type; also our User.id is String (cuid).
   followers         Json?
   passwordHash      String
@@ -159,7 +159,7 @@ model Listing {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   title             String
-  description       String       @db.Text
+  description       String                  @db.Text
   price             Decimal                 @db.Decimal(12, 2)
   currency          String                  @default("AFN")
   listingType       ListingType
@@ -240,7 +240,7 @@ model ListingRenewToken {
   token     String   @unique
   issuedAt  DateTime @default(now())
   expiresAt DateTime
-  used      Int?      @default(0) // number of times the token has been used to renew
+  used      Int?     @default(0) // number of times the token has been used to renew
 
   @@index([expiresAt])
 }
@@ -327,29 +327,16 @@ model JobRecord {
 
 // Soft constraints / indices for queries (per-model indices defined where appropriate)
 
-// Themes model: store design tokens and settings as JSON
-model Themes {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  name      String   @unique
-  // JSON blob containing theme tokens and settings (colors, spacing, typography, etc.)
-  tokens    Json
-  isActive  Boolean  @default(true)
-
-  @@index([createdAt])
-}
-
 // Ads model: store promotional content with placement enum and an online image URL
 model Ad {
-  id         Int         @id @default(autoincrement())
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  title      String
-  body       String?
-  imageUrl   String?     // URL to the ad image hosted online
-  placement  AdPlacement
-  isActive   Boolean     @default(true)
+  id        Int         @id @default(autoincrement())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  title     String
+  body      String?
+  imageUrl  String? // URL to the ad image hosted online
+  placement AdPlacement
+  isActive  Boolean     @default(true)
 
   @@index([placement])
   @@index([isActive])
@@ -374,36 +361,36 @@ model Story {
 }
 
 model StoryImage {
-  id       Int    @id @default(autoincrement())
-  story    Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  id       Int     @id @default(autoincrement())
+  story    Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
   storyId  String
   url      String
-  position Int    @default(0)
+  position Int     @default(0)
   alt      String?
 
   @@index([storyId])
 }
 
 model Blog {
-  id          String        @id @default(cuid())
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  title       String
-  content     String        @db.Text
-  images      Json?
-  likes       Int           @default(0)
-  shares      Int           @default(0)
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  title     String
+  content   String        @db.Text
+  images    Json?
+  likes     Int           @default(0)
+  shares    Int           @default(0)
   // Moderation status: PENDING until admin approves
-  status      BlogStatus    @default(PENDING)
+  status    BlogStatus    @default(PENDING)
   // Track per-user likes/shares as JSON arrays of user IDs
-  likedBy     Json?
-  sharedBy    Json?
+  likedBy   Json?
+  sharedBy  Json?
   // Expiry: set when approved; daily job notifies owner and deletes when reached
-  expiresAt   DateTime?
-  renewedAt   DateTime?
-  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId    String
-  comments    BlogComment[]
+  expiresAt DateTime?
+  renewedAt DateTime?
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  comments  BlogComment[]
 
   @@index([authorId])
   @@index([createdAt])
@@ -434,4 +421,3 @@ model Contact {
   phone     String?
   message   String         @db.Text
 }
-

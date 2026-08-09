@@ -672,45 +672,6 @@ Content-Type: application/json
 }
 
 ###
-# Themes - list all themes (admin only)
-GET {{host}}/themes
-Authorization: Bearer {{adminToken}}
-
-###
-# Themes - get default theme (replace :id if needed) (admin only)
-GET {{host}}/themes/1
-Authorization: Bearer {{adminToken}}
-
-###
-# Themes - create (admin)
-POST {{host}}/themes
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "name": "default",
-  "tokens": {
-    "light": { "color": { "primary": "#0d6efd" } },
-    "dark": { "color": { "primary": "#66b2ff" } }
-  },
-  "isActive": true
-}
-
-###
-# Themes - update theme (admin)
-PUT {{host}}/themes/1
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "tokens": {
-    "light": { "color": { "primary": "#0d6efd", "background": "#ffffff" }, "spacing": { "md": 16 } },
-    "dark": { "color": { "primary": "#66b2ff", "background": "#0b1220" }, "spacing": { "md": 16 } }
-  },
-  "isActive": true
-}
-
-###
 # Listings - update by id
 PUT {{host}}/listings/{{listingId}}
 Authorization: Bearer {{token}}
