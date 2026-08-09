@@ -7,7 +7,7 @@ import { hashPassword } from '../src/utils/password.js';
 
 dotenv.config();
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: { provider: 'mysql', url: process.env.DATABASE_URL } });
 const backendRoot = process.cwd();
 const uploadsRoot = path.resolve(backendRoot, 'uploads');
 const listingImageDir = path.resolve(backendRoot, 'dummydata', 'images');
