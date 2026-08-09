@@ -7,8 +7,7 @@
 // --------------------------------------------------
 datasource db {
   provider = "mysql"
-  // Connection URL moved to prisma.config.ts (Prisma CLI / Migrate)
-  // See: https://pris.ly/d/config-datasource
+  url      = env("DATABASE_URL")
 }
 
 generator client {
