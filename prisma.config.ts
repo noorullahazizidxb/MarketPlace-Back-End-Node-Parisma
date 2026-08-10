@@ -1,12 +1,15 @@
 import "dotenv/config";
-import { defineConfig } from "prisma/config";
-
-const databaseUrl = process.env.DATABASE_URL ?? "mysql://prisma:prisma@localhost:3306/prisma";
-process.env.DATABASE_URL = databaseUrl;
+import path from "node:path";
+import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
-    schema: "prisma/schema.prisma",
-    datasource: {
-        url: databaseUrl,
-    },
+  schema: path.join("prisma", "schema.prisma"),
+  migrations: {
+    path: path.join("prisma", "migrations"),
+  },
+  // Classic query engine + DATABASE_URL (no driver adapter).
+  engine: "classic",
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
 });
