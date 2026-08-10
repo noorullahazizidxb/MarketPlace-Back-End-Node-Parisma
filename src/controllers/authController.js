@@ -6,12 +6,27 @@ import { registerSchema, loginSchema, googleSocialLoginSchema, facebookSocialLog
 import { registerRepresentativeSchema } from '../validation/user.js';
 import { representativeService } from '../services/representativeService.js';
 import { config } from '../config/index.js';
+import { verifyRecaptchaToken } from '../utils/recaptcha.js';
+
+async function requireRecaptcha(req, action) {
+  await verifyRecaptchaToken(req.body?.recaptchaToken, {
+    secret: config.recaptcha.secretKey,
+    minScore: config.recaptcha.minScore,
+    expectedAction: action,
+    remoteip: req.ip,
+  });
+}
 
 export const authController = {
   // NOTE: generic /auth/register removed - use role-specific endpoints
 
   // explicitly register as USER (same as /register)
   async registerUser(req, res) {
+    try {
+      await requireRecaptcha(req, 'register');
+    } catch (e) {
+      return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
+    }
     // if multipart was used, multer may place the file in req.file or req.files (upload.any())
     const payload = { ...req.body };
     if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
@@ -62,6 +77,11 @@ export const authController = {
 
   // register as representative (public endpoint)
   async registerRepresentative(req, res) {
+    try {
+      await requireRecaptcha(req, 'register');
+    } catch (e) {
+      return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
+    }
     const payload = { ...req.body };
     if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
     if (req.file) {
@@ -129,9 +149,15 @@ export const authController = {
   },
 
   async login(req, res) {
+    try {
+      await requireRecaptcha(req, 'login');
+    } catch (e) {
+      return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
+    }
     const { error, value } = loginSchema.validate(req.body);
     if (error) return res.apiError(error.message, 400);
-    const user = await userService.login(value);
+    const { recaptchaToken: _token, ...credentials } = value;
+    const user = await userService.login(credentials);
     if (!user) return res.apiError('Invalid credentials', 401);
     const token = userService.generateToken(user);
     const full = await userService.getFullUser(user.id);

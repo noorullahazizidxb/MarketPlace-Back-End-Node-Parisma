@@ -15,10 +15,12 @@ import adsRouter from './ads.js';
 import storiesRouter from './stories.js';
 import blogsRouter from './blogs.js';
 import contactsRouter from './contacts.js';
+import publicRouter from './public.js';
 
 export function registerRoutes(app, upload) {
   const api = express.Router();
   api.get('/health', (req, res) => res.apiSuccess({ ok: true }, 'OK', 200));
+  api.use('/public', (req, res, next) => { res.locals.entityName = 'Public'; next(); }, publicRouter);
 
   // Listings (create/get/approve...)
   api.use('/listings', (req, res, next) => { res.locals.entityName = 'Listing'; next(); }, listingsRouter);

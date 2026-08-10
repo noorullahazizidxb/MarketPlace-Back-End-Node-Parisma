@@ -40,6 +40,10 @@ export const config = {
     facebookAppId: process.env.FACEBOOK_APP_ID,
     facebookAppSecret: process.env.FACEBOOK_APP_SECRET,
   },
+  recaptcha: {
+    secretKey: process.env.RECAPTCHA_SECRET_KEY || '',
+    minScore: parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5'),
+  },
   retention: {
     unapprovedDays: parseInt(process.env.LISTING_UNAPPROVED_DELETE_AFTER_DAYS || process.env.UNAPPROVED_RETENTION_DAYS || '2', 10),
     renewWindowDays: parseInt(process.env.LISTING_RENEWAL_WINDOW_DAYS || process.env.RENEW_WINDOW_DAYS || '14', 10),

@@ -1,11 +1,24 @@
 import { createContactSchema, listQuerySchema } from '../validation/contact.js';
 import { contactService } from '../services/contactService.js';
 import { logger } from '../utils/logger.js';
+import { config } from '../config/index.js';
+import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 
 export const contactController = {
   async create(req, res) {
     try {
       const payload = { ...req.body };
+      try {
+        await verifyRecaptchaToken(payload.recaptchaToken, {
+          secret: config.recaptcha.secretKey,
+          minScore: config.recaptcha.minScore,
+          expectedAction: 'contact',
+          remoteip: req.ip,
+        });
+      } catch (e) {
+        return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
+      }
+      delete payload.recaptchaToken;
       const { error, value } = createContactSchema.validate(payload);
       if (error) return res.apiError(error.message, 400);
       const created = await contactService.createContact(value);
