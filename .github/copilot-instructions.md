@@ -32,3 +32,11 @@ This repository implements the Marketplace backend API and admin tooling. It pro
 - Code review: .github/instructions/code-review.instructions.md
 
 Keep Copilot suggestions aligned with the repository's patterns: prefer small, testable functions, explicit error handling, and reuse of existing services/repositories.
+
+## Atomic Design Imports
+
+Always import at the atom level from shadcn and use proper atomic design layers: organism, molecules, templates.
+- **Atoms**: `@/components/ui/atoms/shadcn/*` — smallest shadcn primitives (Button, Input, Badge, etc.)
+- **Molecules**: `@/components/ui/molecules/*` — composed atoms (form groups, search bars, etc.)
+- **Organisms**: `@/components/ui/organisms/*` — complex sections (theme-customizer, data tables, etc.)
+- **Templates**: `@/components/ui/templates/*` — full page-level layouts

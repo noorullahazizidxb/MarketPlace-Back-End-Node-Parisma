@@ -1,12 +1,23 @@
 // Prisma schema reflecting marketplace + property rental/sales platform with moderation, roles, representatives, notifications
-// Tools: MySQL provider
+// Tools: MySQL provider (default) — set DATABASE_PROVIDER=sqlite for local SQLite development
 // NOTE: After creating this file run: npx prisma migrate dev --name init
+//
+// ── Local SQLite development ──────────────────────────────────────────────────
+// In .env:
+//   DATABASE_PROVIDER=sqlite
+//   DATABASE_URL="file:./dev.db"
+//
+// ── MySQL / PostgreSQL production ─────────────────────────────────────────────
+// In .env:
+//   DATABASE_PROVIDER=mysql          (or postgresql)
+//   DATABASE_URL="mysql://user:pass@host:3306/dbname"
+// --------------------------------------------------
 
 // --------------------------------------------------
 // Datasource & Generator
 // --------------------------------------------------
 datasource db {
-  provider = "mysql"
+  provider = env("DATABASE_PROVIDER")
   url      = env("DATABASE_URL")
 }
 
