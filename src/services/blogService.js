@@ -1,6 +1,8 @@
 import { blogRepository } from '../repositories/blogRepository.js';
 import { config } from '../config/index.js';
 import { searchBlogs } from '../search/elasticsearch.js';
+import { logger } from '../utils/logger.js';
+import { NotFoundError, ForbiddenError } from '../utils/AppError.js';
 
 export const blogService = {
   async createBlog(payload, authorId) {
@@ -9,12 +11,8 @@ export const blogService = {
   },
   async updateBlog(id, payload, userId) {
     const existing = await blogRepository.getById(id);
-    if (!existing) throw new Error('Not found');
-    if (existing.authorId !== userId) {
-      const e = new Error('Forbidden');
-      e.status = 403;
-      throw e;
-    }
+    if (!existing) throw new NotFoundError('Blog');
+    if (existing.authorId !== userId) throw new ForbiddenError();
     return blogRepository.update(id, payload);
   },
   async deleteBlog(id) {
@@ -33,6 +31,7 @@ export const blogService = {
       if (!result.ids.length) return [];
       return blogRepository.listByIds(result.ids);
     } catch (error) {
+      logger.warn({ err: error?.message }, 'Elasticsearch unavailable, falling back to DB search');
       return blogRepository.list(term);
     }
   },
@@ -47,7 +46,7 @@ export const blogService = {
   },
   async approveBlog(id) {
     const blog = await blogRepository.getById(id);
-    if (!blog) throw new Error('Not found');
+    if (!blog) throw new NotFoundError('Blog');
     const expiryDays = config.retention.blogDefaultExpiryDays || 90;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiryDays);
@@ -55,17 +54,13 @@ export const blogService = {
   },
   async rejectBlog(id) {
     const blog = await blogRepository.getById(id);
-    if (!blog) throw new Error('Not found');
+    if (!blog) throw new NotFoundError('Blog');
     return blogRepository.setStatus(id, 'REJECTED');
   },
   async renewBlog(id, userId) {
     const blog = await blogRepository.getById(id);
-    if (!blog) throw new Error('Not found');
-    if (blog.authorId !== userId) {
-      const e = new Error('Forbidden');
-      e.status = 403;
-      throw e;
-    }
+    if (!blog) throw new NotFoundError('Blog');
+    if (blog.authorId !== userId) throw new ForbiddenError();
     if (blog.status !== 'APPROVED') throw new Error('Only approved blogs can be renewed');
     const expiryDays = config.retention.blogDefaultExpiryDays || 90;
     const expiresAt = new Date();

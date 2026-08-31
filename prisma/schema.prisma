@@ -16,10 +16,6 @@
 // --------------------------------------------------
 // Datasource & Generator
 // --------------------------------------------------
-datasource db {
-  provider = env("DATABASE_PROVIDER")
-  url      = env("DATABASE_URL")
-}
 
 generator client {
   provider = "prisma-client-js"

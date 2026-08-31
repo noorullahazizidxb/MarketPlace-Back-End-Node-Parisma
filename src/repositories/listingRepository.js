@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { storage } from '../utils/storage.js';
+import { LISTING_FULL_INCLUDE, LISTING_SUMMARY_INCLUDE } from '../constants/queryIncludes.js';
 
 export const listingRepository = {
   async create(data) {
@@ -7,16 +8,7 @@ export const listingRepository = {
   },
 
   async getById(id) {
-    return prisma.listing.findUnique({
-      where: { id },
-      include: {
-  images: true,
-  representatives: { include: { representative: true } },
-  user: { include: { roles: true } },
-  category: true,
-  feedbacks: { include: { user: { select: { id: true, fullName: true, firstName: true, lastName: true, photo: true } } } }
-      }
-    });
+    return prisma.listing.findUnique({ where: { id }, include: LISTING_FULL_INCLUDE });
   },
 
   async update(id, data) {
@@ -54,7 +46,7 @@ export const listingRepository = {
     const take = opts.limit || 20;
     const skip = opts.offset || 0;
 
-  return prisma.listing.findMany({ where, take, skip, orderBy: { createdAt: 'desc' }, include: { images: true, user: { include: { roles: true } }, category: true, representatives: { include: { representative: true } } } });
+    return prisma.listing.findMany({ where, take, skip, orderBy: { createdAt: 'desc' }, include: LISTING_SUMMARY_INCLUDE });
   },
 
   async findUnapprovedOlderThan(cutoffDate) {
