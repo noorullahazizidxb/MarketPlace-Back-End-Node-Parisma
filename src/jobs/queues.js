@@ -4,6 +4,7 @@ const { Queue, QueueScheduler } = require('bullmq');
 import IORedis from 'ioredis';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { queueEnabled } from '../lib/runtime.js';
 
 export const QUEUES = {
   MODERATION_CLEANUP: 'moderation-cleanup',
@@ -11,7 +12,6 @@ export const QUEUES = {
   NOTIFICATION_DISPATCH: 'notification-dispatch',
   RENEWAL_REMINDER: 'renewal-reminder',
   CONTENT_CLEANUP: 'content-cleanup',
-  // Previously inactive — now fully scheduled
   STATUS_CLEANUP: 'status-cleanup',
   RENEWAL_EXPIRE: 'renewal-cleanup',
   FEEDBACK_REMINDER: 'feedback-reminder',
@@ -29,9 +29,22 @@ function getConnection() {
   return connections.primary;
 }
 
+function noopQueue() {
+  return {
+    add: async () => null,
+  };
+}
+
 export const queues = {};
 
 export async function initQueues() {
+  if (!queueEnabled) {
+    for (const qName of Object.values(QUEUES)) {
+      queues[qName] = noopQueue();
+    }
+    logger.info('Queues skipped (Redis/BullMQ disabled)');
+    return;
+  }
   for (const qName of Object.values(QUEUES)) {
     queues[qName] = new Queue(qName, { connection: getConnection() });
     try {

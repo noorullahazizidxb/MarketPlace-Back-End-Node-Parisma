@@ -1,11 +1,11 @@
 import express from 'express';
-import multer from 'multer';
 import { blogController } from '../controllers/blogController.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { compressUploads } from '../middleware/compressUploads.js';
+import { createUpload } from '../lib/upload.js';
 
 const router = express.Router();
-const upload = multer({ dest: 'tmp/uploads' });
+const upload = createUpload();
 
 // Public list (only APPROVED blogs)
 router.get('/', blogController.list);

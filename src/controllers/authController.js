@@ -7,6 +7,7 @@ import { registerRepresentativeSchema } from '../validation/user.js';
 import { representativeService } from '../services/representativeService.js';
 import { config } from '../config/index.js';
 import { verifyRecaptchaToken } from '../utils/recaptcha.js';
+import { publicFileUrl } from '../lib/upload.js';
 
 async function requireRecaptcha(req, action) {
   await verifyRecaptchaToken(req.body?.recaptchaToken, {
@@ -34,7 +35,7 @@ export const authController = {
       // try to move temp upload to permanent location
       try {
         const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        payload.photo = publicFileUrl(req.file, dest);
       } catch (e) {
         // fallback: store temp path reference
         payload.photo = `/${req.file.path}`;
@@ -87,7 +88,7 @@ export const authController = {
     if (req.file) {
       try {
         const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        payload.photo = publicFileUrl(req.file, dest);
       } catch (e) {
         payload.photo = `/${req.file.path}`;
       }
@@ -129,7 +130,7 @@ export const authController = {
     if (req.file) {
       try {
         const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        payload.photo = publicFileUrl(req.file, dest);
       } catch (e) {
         payload.photo = `/${req.file.path}`;
       }

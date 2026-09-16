@@ -1,12 +1,12 @@
 import express from 'express';
 import { listingController } from '../controllers/listingController.js';
-import multer from 'multer';
 import { compressUploads } from '../middleware/compressUploads.js';
 import { requireAuth } from '../middleware/auth.js';
+import { createUpload } from '../lib/upload.js';
 
 const router = express.Router();
 
-const upload = multer({ dest: 'tmp/uploads' });
+const upload = createUpload();
 // List approved listings (public)
 router.get('/', listingController.listApproved);
 // List approved listings with hidden seller contact

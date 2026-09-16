@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { searchEnabled } from '../lib/runtime.js';
 dotenv.config();
 
 function readEnv(...keys) {
@@ -23,8 +24,8 @@ export const config = {
   redisUsername: process.env.REDIS_USERNAME || '',
   redisPassword: process.env.REDIS_PASSWORD || '',
   elastic: {
-    enabled: parseBoolean(readEnv('ENABLE-ELASTIC-SEARCH', 'ENABLE_ELASTIC_SEARCH'), true),
-    node: process.env.ELASTICSEARCH_NODE || 'https://localhost:9200',
+    enabled: searchEnabled,
+    node: process.env.ELASTICSEARCH_URL || process.env.ELASTICSEARCH_NODE || 'http://127.0.0.1:9200',
     username: process.env.ELASTICSEARCH_USERNAME || '',
     password: process.env.ELASTICSEARCH_PASSWORD,
     index: process.env.ELASTICSEARCH_INDEX || 'listings',
@@ -33,7 +34,7 @@ export const config = {
     allowSelfSigned: parseBoolean(process.env.ELASTICSEARCH_ALLOW_SELF_SIGNED, true)
   },
   tokens: {
-    secret: process.env.TOKEN_SECRET || 'dev_secret'
+    secret: process.env.TOKEN_SECRET || process.env.JWT_SECRET || 'dev_secret'
   },
   socialAuth: {
     googleClientId: process.env.GOOGLE_CLIENT_ID,

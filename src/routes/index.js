@@ -16,10 +16,11 @@ import storiesRouter from './stories.js';
 import blogsRouter from './blogs.js';
 import contactsRouter from './contacts.js';
 import publicRouter from './public.js';
+import { runtimeSummary } from '../lib/runtime.js';
 
-export function registerRoutes(app, upload) {
+export function registerRoutes(app) {
   const api = express.Router();
-  api.get('/health', (req, res) => res.apiSuccess({ ok: true }, 'OK', 200));
+  api.get('/health', (req, res) => res.apiSuccess({ ok: true, runtime: runtimeSummary() }, 'OK', 200));
   api.use('/public', (req, res, next) => { res.locals.entityName = 'Public'; next(); }, publicRouter);
 
   // Listings (create/get/approve...)

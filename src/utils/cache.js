@@ -33,6 +33,10 @@ class SimpleLRU {
       this.map.delete(oldestKey);
     }
   }
+
+  del(key) {
+    this.map.delete(key);
+  }
 }
 
 // Small LRU cache for quick responses (in-memory, per-process)

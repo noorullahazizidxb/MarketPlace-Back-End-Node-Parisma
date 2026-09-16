@@ -1,13 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger.js';
 
+const provider = String(process.env.DB_PROVIDER || 'mysql').toLowerCase();
+const datasourceUrl =
+  provider === 'sqlite'
+    ? (process.env.SQLITE_URL || 'file:./dev.db')
+    : process.env.DATABASE_URL;
+
 let prisma;
 
 if (!global.__prisma) {
-  // Classic engine: DATABASE_URL from env / schema. Do not pass a fake
-  // `adapter: { provider, url }` object — that is not a driver adapter and
-  // crashes with "adapter?.connect is not a function".
   prisma = new PrismaClient({
+    ...(datasourceUrl ? { datasources: { db: { url: datasourceUrl } } } : {}),
     log: [
       { level: 'query', emit: 'event' },
       { level: 'error', emit: 'event' },

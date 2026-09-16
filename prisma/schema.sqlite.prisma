@@ -1,0 +1,436 @@
+// Prisma schema reflecting marketplace + property rental/sales platform with moderation, roles, representatives, notifications
+// Tools: MySQL provider (default) — set DATABASE_PROVIDER=sqlite for local SQLite development
+// NOTE: After creating this file run: npx prisma migrate dev --name init
+//
+// ── Local SQLite development ──────────────────────────────────────────────────
+// In .env:
+//   DATABASE_PROVIDER=sqlite
+//   DATABASE_URL="file:./dev.db"
+//
+// ── MySQL / PostgreSQL production ─────────────────────────────────────────────
+// In .env:
+//   DATABASE_PROVIDER=mysql          (or postgresql)
+//   DATABASE_URL="mysql://user:pass@host:3306/dbname"
+// --------------------------------------------------
+
+// --------------------------------------------------
+// Datasource & Generator
+// --------------------------------------------------
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("SQLITE_URL")
+}
+
+// --------------------------------------------------
+// Enums
+// --------------------------------------------------
+enum Role {
+  ADMIN
+  USER
+  REPRESENTATIVE
+}
+
+enum ListingType {
+  RENT
+  SALE
+}
+
+enum ListingStatus {
+  PENDING // awaiting admin approval
+  APPROVED // visible & active
+  REJECTED // rejected by admin
+  SOLD // sold (for sales) triggers cleanup after retention window
+  RENTED // rented (for rentals) triggers feedback & potential cleanup
+  EXPIRED // time based expiration (not renewed)
+  DRAFT // user saved but not submitted; periodically cleaned
+  HIDDEN // temporarily hidden by admin
+}
+
+enum ContactVisibility {
+  HIDE_SELLER // show platform contact info
+  SHOW_SELLER // show seller contact info
+}
+
+enum NotificationTargetType {
+  USER
+  ROLE
+  ALL
+  LISTING
+}
+
+enum NotificationChannel {
+  SYSTEM
+  EMAIL
+  WHATSAPP
+  PUSH
+}
+
+enum AdPlacement {
+  HOME_PAGE_1ST
+  HOME_PAGE_2ND
+  HOME_PAGE_3RD
+  DETAIL_PAGE_1ST
+  DETAIL_PAGE_2ND
+  DETAIL_PAGE_SIDEBAR
+}
+
+enum ContactSubject {
+  generalQuestion
+  listingSupport
+  accountIssue
+  partnershipInquiry
+}
+
+enum BlogStatus {
+  PENDING // awaiting admin review after author submission
+  APPROVED // visible to the public
+  REJECTED // hidden; author notified
+}
+
+// --------------------------------------------------
+// Models
+// --------------------------------------------------
+model User {
+  id                String                  @id @default(cuid())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  email             String?                 @unique
+  phone             String?
+  photo             String?
+  firstName         String?
+  lastName          String?
+  fullName          String?
+  contacts          Json?
+  address           Json?
+  metadata          Json? // arbitrary profile / preference data
+  // Followers: store as JSON array of User IDs (strings). MySQL doesn't support array type; also our User.id is String (cuid).
+  followers         Json?
+  passwordHash      String
+  roles             UserRole[]
+  listings          Listing[]
+  representatives   RepresentativeInfo[]
+  notifications     NotificationRecipient[]
+  sentNotifications Notification[]          @relation("SenderNotifications")
+  // Listings this user approved
+  approvedListings  Listing[]               @relation("ListingApprovedBy")
+  // Audit logs where this user acted
+  auditLogs         AuditLog[]
+  feedbacks         ListingFeedback[]
+  // Authored content
+  stories           Story[]
+  blogs             Blog[]
+  blogComments      BlogComment[]
+
+  @@index([phone])
+}
+
+model UserRole {
+  id     Int    @id @default(autoincrement())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  role   Role
+
+  @@unique([userId, role])
+}
+
+model RepresentativeInfo {
+  id             Int                     @id @default(autoincrement())
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  region         String
+  whatsappNumber String?
+  active         Boolean                 @default(true)
+  listings       ListingRepresentative[]
+
+  @@index([region])
+  @@index([whatsappNumber])
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  name      String
+  slug      String     @unique
+  parentId  Int?
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  listings  Listing[]
+  isActive  Boolean    @default(true)
+
+  @@index([parentId])
+}
+
+model Listing {
+  id                String                  @id @default(cuid())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  title             String
+  description       String
+  price             Decimal
+  currency          String                  @default("AFN")
+  listingType       ListingType
+  status            ListingStatus           @default(PENDING)
+  contactVisibility ContactVisibility       @default(HIDE_SELLER)
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  category          Category                @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId        Int
+  location          String?
+  address           String?
+  metadata          Json?
+  approvedAt        DateTime?
+  approvedById      String?
+  approvedBy        User?                   @relation("ListingApprovedBy", fields: [approvedById], references: [id])
+  expiresAt         DateTime?
+  soldOrRentedAt    DateTime?
+  images            ListingImage[]
+  representatives   ListingRepresentative[]
+  feedbacks         ListingFeedback[]
+  searchIndex       SearchIndex?
+  renewTokens       ListingRenewToken[]
+  notifications     Notification[]          @relation("ListingNotifications")
+
+  @@index([createdAt])
+  @@index([listingType])
+  @@index([status])
+  @@index([userId])
+  @@index([categoryId])
+  @@index([location])
+  @@index([expiresAt])
+}
+
+model ListingImage {
+  id        Int     @id @default(autoincrement())
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  url       String
+  position  Int     @default(0)
+  alt       String?
+
+  @@index([listingId])
+}
+
+model ListingRepresentative {
+  id               Int                @id @default(autoincrement())
+  listing          Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId        String
+  representative   RepresentativeInfo @relation(fields: [representativeId], references: [id], onDelete: Cascade)
+  representativeId Int
+  assignedAt       DateTime           @default(now())
+
+  @@unique([listingId, representativeId])
+  @@index([listingId])
+  @@index([representativeId])
+}
+
+model ListingFeedback {
+  id          Int           @id @default(autoincrement())
+  listing     Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId   String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  statusAfter ListingStatus
+  // numeric rating provided by the user (e.g., 1-5)
+  rating      Int?
+  comment     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([listingId])
+  @@index([userId])
+}
+
+model ListingRenewToken {
+  id        Int      @id @default(autoincrement())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String   @unique
+  token     String   @unique
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  used      Int?     @default(0) // number of times the token has been used to renew
+
+  @@index([expiresAt])
+}
+
+// Denormalized search index model to sync into Elasticsearch asynchronously (acts as staging/versioning)
+model SearchIndex {
+  id        Int      @id @default(autoincrement())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String   @unique
+  payload   Json // flattened searchable fields used to push to ES
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id           String                  @id @default(cuid())
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  title        String
+  message      String
+  channel      NotificationChannel     @default(SYSTEM)
+  targetType   NotificationTargetType
+  sender       User?                   @relation("SenderNotifications", fields: [senderId], references: [id])
+  senderId     String?
+  listing      Listing?                @relation("ListingNotifications", fields: [listingId], references: [id])
+  listingId    String?
+  recipients   NotificationRecipient[]
+  sentAt       DateTime?
+  meta         Json?
+  triggerEvent String?
+
+  @@index([targetType])
+  @@index([triggerEvent])
+}
+
+model NotificationRecipient {
+  id             Int          @id @default(autoincrement())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notificationId String
+  user           User?        @relation(fields: [userId], references: [id])
+  userId         String?
+  role           Role?
+  readAt         DateTime?
+  deliveredAt    DateTime?
+  deliveryError  String?
+
+  @@index([role])
+  @@index([notificationId])
+  @@index([userId])
+}
+
+// Audit trail for moderation actions, cleanups, status changes
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  listingId String?
+  action    String
+  details   Json?
+  ip        String?
+
+  @@index([actorId])
+  @@index([listingId])
+  @@index([action])
+}
+
+// Queue persistence for idempotency (optional; BullMQ stores in Redis, but we can track for audits)
+model JobRecord {
+  id          Int       @id @default(autoincrement())
+  createdAt   DateTime  @default(now())
+  queue       String
+  jobId       String    @unique
+  name        String
+  payload     Json?
+  status      String    @default("ENQUEUED")
+  lastError   String?
+  processedAt DateTime?
+
+  @@index([queue])
+  @@index([name])
+  @@index([status])
+}
+
+// Soft constraints / indices for queries (per-model indices defined where appropriate)
+
+// Ads model: store promotional content with placement enum and an online image URL
+model Ad {
+  id        Int         @id @default(autoincrement())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  title     String
+  body      String?
+  imageUrl  String? // URL to the ad image hosted online
+  placement AdPlacement
+  isActive  Boolean     @default(true)
+
+  @@index([placement])
+  @@index([isActive])
+}
+
+// ------------------------------
+// New content models: Story & Blog
+// ------------------------------
+
+model Story {
+  id          String       @id @default(cuid())
+  createdAt   DateTime     @default(now())
+  title       String
+  description String
+  videoUrl    String?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  images      StoryImage[]
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model StoryImage {
+  id       Int     @id @default(autoincrement())
+  story    Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  storyId  String
+  url      String
+  position Int     @default(0)
+  alt      String?
+
+  @@index([storyId])
+}
+
+model Blog {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  title     String
+  content   String
+  images    Json?
+  likes     Int           @default(0)
+  shares    Int           @default(0)
+  // Moderation status: PENDING until admin approves
+  status    BlogStatus    @default(PENDING)
+  // Track per-user likes/shares as JSON arrays of user IDs
+  likedBy   Json?
+  sharedBy  Json?
+  // Expiry: set when approved; daily job notifies owner and deletes when reached
+  expiresAt DateTime?
+  renewedAt DateTime?
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  comments  BlogComment[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model BlogComment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  body      String
+  blog      Blog     @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  blogId    String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+
+  @@index([blogId])
+  @@index([authorId])
+}
+
+// Simple contact form entries collected via API
+model Contact {
+  id        Int            @id @default(autoincrement())
+  createdAt DateTime       @default(now())
+  name      String
+  email     String
+  subject   ContactSubject
+  phone     String?
+  message   String
+}

@@ -6,6 +6,7 @@ import { updateUserSchema, updateProfileSchema } from '../validation/user.js';
 import { hashPassword } from '../utils/password.js';
 import { searchUsers, suggestUsers } from '../search/elasticsearch.js';
 import { config } from '../config/index.js';
+import { publicFileUrl } from '../lib/upload.js';
 
 
 export const userController = {
@@ -18,7 +19,7 @@ export const userController = {
       // move file from multer tmp to uploads/users/{userId}_{originalname}
       const uploadsDir = path.join('uploads', 'users');
       const dest = await storage.saveTempTo(uploadsDir, req.file.path, `${userId}_${req.file.originalname}`);
-      const url = `/${dest}`;
+      const url = publicFileUrl(req.file, dest);
       // delete previous photo if present
       const prev = (await prisma.user.findUnique({ where: { id: userId } })).photo;
       if (prev) await storage.deletePath(prev);

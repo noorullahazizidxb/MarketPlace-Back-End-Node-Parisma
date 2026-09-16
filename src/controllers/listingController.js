@@ -6,6 +6,7 @@ import { storage } from '../utils/storage.js';
 import { config } from '../config/index.js';
 import { LISTING_FULL_INCLUDE, LISTING_APPROVAL_INCLUDE, LISTING_SUMMARY_INCLUDE } from '../constants/queryIncludes.js';
 import { enrichListingWithStats, enrichListingsWithStats } from '../utils/listingEnricher.js';
+import { publicFileUrl } from '../lib/upload.js';
 
 export const listingController = {
   async create(req, res) {
@@ -29,7 +30,7 @@ export const listingController = {
           const f = req.files[i];
           try {
             const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
-            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            const url = publicFileUrl(f, dest);
             await prisma.listingImage.create({ data: { listingId: listing.id, url, position: i } });
           } catch (e) {
             logger.warn({ err: e.message }, 'Failed to persist uploaded image');
@@ -251,7 +252,7 @@ export const listingController = {
       const uploadsDir = `uploads/listings/${id}`;
       const { storage } = await import('../utils/storage.js');
       const dest = await storage.saveTempTo(uploadsDir, req.file.path, req.file.originalname);
-      const url = `/${dest}`;
+      const url = publicFileUrl(req.file, dest);
       const { prisma } = await import('../config/prisma.js');
 
       // If replace behavior requested, delete previous image by imageId
@@ -316,7 +317,7 @@ export const listingController = {
         for (const f of req.files) {
           try {
             const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || f.fieldname || 'image');
-            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            const url = publicFileUrl(f, dest);
             payload.images.push({ url, position: base++ });
           } catch (e) { }
         }
@@ -407,7 +408,7 @@ export const listingController = {
         for (const f of req.files) {
           try {
             const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || f.fieldname || 'image');
-            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            const url = publicFileUrl(f, dest);
             payload.__uploadedFiles.push({ url, position: base++ });
           } catch (e) {
             logger.warn(e, 'Failed to persist uploaded patch image');

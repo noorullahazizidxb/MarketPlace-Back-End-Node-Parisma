@@ -3,6 +3,7 @@ import { storyService } from '../services/storyService.js';
 import { logger } from '../utils/logger.js';
 import { storage } from '../utils/storage.js';
 import { prisma } from '../config/prisma.js';
+import { publicFileUrl } from '../lib/upload.js';
 
 export const storyController = {
   async create(req, res) {
@@ -24,7 +25,7 @@ export const storyController = {
             const f = req.files[i];
             try {
               const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
-              const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+              const url = publicFileUrl(f, dest);
               urls.push(url);
             } catch (e) {
               logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded story image');
@@ -93,7 +94,7 @@ export async function updateStory(req, res) {
           const f = req.files[i];
           try {
             const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
-            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            const url = publicFileUrl(f, dest);
             urls.push(url);
           } catch (e) {
             logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded story image on update');

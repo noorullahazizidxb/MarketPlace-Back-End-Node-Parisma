@@ -1,16 +1,19 @@
 import rateLimit from 'express-rate-limit';
 import { getRedis } from '../utils/redisClient.js';
+import { redisEnabled } from '../lib/runtime.js';
+
 let RedisStore;
 try {
-  // require on demand to avoid adding it if not installed
-  // eslint-disable-next-line import/no-extraneous-dependencies
   RedisStore = (await import('rate-limit-redis')).default;
-} catch (e) {
+} catch {
   RedisStore = null;
 }
 
 function createLimiter(opts) {
-  const store = RedisStore ? new RedisStore({ sendCommand: (...args) => getRedis().call(...args) }) : undefined;
+  const redis = redisEnabled ? getRedis() : null;
+  const store = RedisStore && redis
+    ? new RedisStore({ sendCommand: (...args) => redis.call(...args) })
+    : undefined;
   return rateLimit({ store, ...opts });
 }
 

@@ -1,6 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { logger } from './logger.js';
+import { blobEnabled } from '../lib/runtime.js';
+import { resolveUploadDir } from '../lib/upload.js';
 
 // Small sleep helper for retry backoff
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -51,15 +53,29 @@ async function copyThenUnlink(src, dest) {
 export const storage = {
   async saveTempTo(destDir, tempPath, originalName) {
     try {
-      await fs.mkdir(destDir, { recursive: true });
+      // Always land under uploadsRoot() so Express static and Vercel /tmp stay aligned.
+      const absoluteDir = resolveUploadDir(destDir);
+      await fs.mkdir(absoluteDir, { recursive: true });
       // sanitize originalName to avoid path traversal and invalid chars
       const baseName = (originalName || 'file')
         .replace(/\\/g, '/')
         .split('/')
         .pop()
         .replace(/[^A-Za-z0-9._-]+/g, '_');
-  const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const dest = path.join(destDir, `${unique}_${baseName}`);
+      const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const dest = path.join(absoluteDir, `${unique}_${baseName}`);
+      if (blobEnabled) {
+        const { put } = await import('@vercel/blob');
+        const data = await fs.readFile(tempPath);
+        const folder = path.basename(absoluteDir) || 'uploads';
+        const blob = await put(`uploads/${folder}/${unique}_${baseName}`, data, {
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          addRandomSuffix: false,
+        });
+        try { await fs.unlink(tempPath); } catch { /* ignore */ }
+        return blob.url;
+      }
       await moveWithRetries(tempPath, dest, { attempts: 6, baseDelay: 60 });
       return dest;
     } catch (e) {

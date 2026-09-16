@@ -3,19 +3,29 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
 import { logger } from '../utils/logger.js';
+import { corsOrigins, socketEnabled } from '../lib/runtime.js';
+
+const noopRoom = { emit() {} };
+const noopIo = {
+  emit() {},
+  to() { return noopRoom; },
+};
 
 let io;
 
 export function initWebsockets(server) {
+  if (!socketEnabled) {
+    logger.info('Socket.IO init skipped');
+    return noopIo;
+  }
   io = new Server(server, {
-    cors: { origin: '*' }
+    cors: { origin: corsOrigins() === true ? '*' : corsOrigins() },
   });
 
   io.use(async (socket, next) => {
     try {
       let token = socket.handshake.auth?.token || socket.handshake.query?.token || socket.handshake.headers?.authorization;
       if (!token) return next();
-      // allow `Bearer <token>` format
       if (typeof token === 'string' && token.startsWith('Bearer ')) token = token.slice(7);
       const payload = jwt.verify(token, config.tokens.secret);
       const user = await prisma.user.findUnique({ where: { id: payload.sub }, include: { roles: true } });
@@ -32,12 +42,10 @@ export function initWebsockets(server) {
   io.on('connection', (socket) => {
     logger.info({ socketId: socket.id, user: socket.data.user }, 'Socket connected');
     const roles = socket.data.user?.roles || [];
-    // Admins join the approvals room to receive listings for approval
     if (roles.includes('ADMIN')) {
       socket.join('approvals');
       logger.info({ socketId: socket.id }, 'Joined approvals room');
     }
-    // If user is authenticated, join a personal room for notifications
     if (socket.data.user?.id) {
       const uid = socket.data.user.id;
       socket.join(`user:${uid}`);
@@ -53,8 +61,7 @@ export function initWebsockets(server) {
 }
 
 export function getIO() {
-  if (!io) throw new Error('Socket.IO not initialized');
-  return io;
+  return io || noopIo;
 }
 
 export function emitToApprovals(event, data) {

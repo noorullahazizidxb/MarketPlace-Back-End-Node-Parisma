@@ -1,8 +1,13 @@
 import { queues, QUEUES } from '../jobs/queues.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { queueEnabled } from '../lib/runtime.js';
 
 export async function scheduleRecurringJobs() {
+  if (!queueEnabled) {
+    logger.info('Recurring jobs skipped (queues disabled)');
+    return;
+  }
   // Schedule moderation cleanup daily
   const unapprovedCutoff = new Date();
   unapprovedCutoff.setDate(unapprovedCutoff.getDate() - config.retention.unapprovedDays);

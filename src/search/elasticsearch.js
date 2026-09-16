@@ -1,11 +1,12 @@
 import { Client } from '@elastic/elasticsearch';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { searchEnabled } from '../lib/runtime.js';
 
 let esClient;
 
 export function isElasticEnabled() {
-  return Boolean(config.elastic.enabled);
+  return Boolean(searchEnabled && config.elastic.enabled);
 }
 
 export function getES() {

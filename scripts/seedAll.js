@@ -12,8 +12,8 @@ const backendRoot = process.cwd();
 const uploadsRoot = path.resolve(backendRoot, 'uploads');
 const listingImageDir = path.resolve(backendRoot, 'dummydata', 'images');
 const profileImageDir = path.resolve(backendRoot, 'dummydata', 'UserProfileImages');
-const defaultPassword = process.env.SEED_USER_PASSWORD || 'MarketPlace@2026';
-const adminEmail = process.env.ADMIN_EMAIL || 'admin@marketplace.example.com';
+const defaultPassword = process.env.SEED_USER_PASSWORD || process.env.ADMIN_PASSWORD || 'MarketPlace@2026';
+const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
 const adminPhone = process.env.ADMIN_PHONE || '+93700000001';
 
 const afghanLocations = [
@@ -92,6 +92,7 @@ const listingSeed = [
     imageFile: 'Apple-iPhone-14-Pro-Mobile-Phone-493177786-i-1-1200Wx1200H-485x485-optimized.webp',
     listingType: 'SALE',
     price: 79500,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { brand: 'Apple', model: 'iPhone 14 Pro', storage: '256GB', condition: 'Used - Excellent', batteryHealth: '89%' },
     description:
       'Factory-unlocked iPhone 14 Pro in clean condition with 256GB storage, 89% battery health, original box, and charging cable. Suitable for business use, mobile photography, and daily commuting in Kabul.',
@@ -103,6 +104,7 @@ const listingSeed = [
     imageFile: 'Google_-_Pixel_9_Pro_-_Obsidian_3__08783.webp',
     listingType: 'SALE',
     price: 68200,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { brand: 'Google', model: 'Pixel 9 Pro', storage: '128GB', condition: 'New - Open Box', warranty: '7 days checking warranty' },
     description:
       'Pixel 9 Pro with original packaging and tempered glass already installed. The device was brought from Dubai and is offered with a seven-day checking warranty for serious buyers in Kabul.',
@@ -158,6 +160,7 @@ const listingSeed = [
     imageFile: 'appleLaptop1.jpg',
     listingType: 'SALE',
     price: 134000,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { brand: 'Apple', model: 'MacBook Pro 16-inch', memory: '16GB', storage: '512GB SSD', condition: 'Used - Excellent' },
     description:
       'MacBook Pro 16-inch with 16GB memory and 512GB SSD, maintained by a freelance designer. The machine runs quietly and is suitable for editing, programming, and remote client work.',
@@ -169,6 +172,7 @@ const listingSeed = [
     imageFile: 'gamingLaptop1.jpg',
     listingType: 'SALE',
     price: 96500,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { brand: 'ASUS', model: 'ROG Zephyrus', graphics: 'Dedicated GPU', condition: 'Used - Very Good', usage: 'Gaming and rendering' },
     description:
       'ASUS ROG Zephyrus laptop with high-refresh display and dedicated graphics. The owner used it for architectural rendering and competitive gaming, and the cooling system remains in good condition.',
@@ -202,6 +206,7 @@ const listingSeed = [
     imageFile: 'hdm-airpodsmax-046-1647967194.avif',
     listingType: 'SALE',
     price: 34800,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { brand: 'Apple', model: 'AirPods Max', condition: 'Used - Excellent', feature: 'Noise Cancellation' },
     description:
       'AirPods Max in silver finish with active noise cancellation and carrying case. The headphones were used mainly indoors and remain a premium option for music, editing, and long calls.',
@@ -224,6 +229,7 @@ const listingSeed = [
     imageFile: 'bedwithstorage.jpg',
     listingType: 'SALE',
     price: 25500,
+    contactVisibility: 'HIDE_SELLER',
     metadata: { material: 'Engineered wood', size: 'Queen', condition: 'Used - Very Good', feature: 'Under-bed storage' },
     description:
       'Queen-size bed frame with built-in storage drawers and matching headboard. It is suitable for compact apartments where practical storage matters as much as appearance.',
@@ -715,6 +721,8 @@ async function main() {
     const approvedAt = new Date(Date.now() - index * 24 * 60 * 60 * 1000);
     const expiresAt = new Date(Date.now() + (45 + index) * 24 * 60 * 60 * 1000);
 
+    const contactVisibility = seed.contactVisibility ?? 'SHOW_SELLER';
+
     const listing = await prisma.listing.create({
       data: {
         title: seed.title,
@@ -723,7 +731,7 @@ async function main() {
         currency: 'AFN',
         listingType: seed.listingType,
         status: 'APPROVED',
-        contactVisibility: 'SHOW_SELLER',
+        contactVisibility,
         userId: seller.id,
         categoryId: categories.get(seed.categorySlug).id,
         location: locationLabel(location),
@@ -750,12 +758,14 @@ async function main() {
       },
     });
 
-    await prisma.listingRepresentative.create({
-      data: {
-        listingId: listing.id,
-        representativeId: representative.id,
-      },
-    });
+    if (contactVisibility === 'HIDE_SELLER') {
+      await prisma.listingRepresentative.create({
+        data: {
+          listingId: listing.id,
+          representativeId: representative.id,
+        },
+      });
+    }
 
     await prisma.listingFeedback.create({
       data: {
@@ -972,10 +982,13 @@ async function main() {
     });
   }
 
+  const hiddenSellerCount = listings.filter((l) => l.contactVisibility === 'HIDE_SELLER').length;
+  const showSellerCount = listings.length - hiddenSellerCount;
+
   console.log('Seed summary:');
   console.log(`  Users: ${users.length}`);
   console.log(`  Categories: ${categorySeed.length}`);
-  console.log(`  Listings: ${listings.length}`);
+  console.log(`  Listings: ${listings.length} (${hiddenSellerCount} HIDE_SELLER / promoted, ${showSellerCount} SHOW_SELLER)`);
   console.log(`  Stories: ${listings.length}`);
   console.log(`  Blogs: ${blogSeed.length}`);
   console.log(`  Contacts: ${contactMessages.length}`);
