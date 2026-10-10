@@ -1,22 +1,12 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { Worker, QueueEvents } = require('bullmq');
-import IORedis from 'ioredis';
-import { config } from '../config/index.js';
-import { prisma } from '../config/prisma.js';
-import { logger } from '../utils/logger.js';
+import { startQueueWorker } from '../jobs/bullmq.js';
+import { runRenewalExpire } from '../jobs/handlers.js';
 
-const connection = new IORedis(config.redisUrl, { maxRetriesPerRequest: null, lazyConnect: false });
+let worker = null;
 
-export const renewalCleanupWorker = new Worker('renewal-cleanup', async (job) => {
-  // Find expired listings (expiresAt < now) and not renewed -> set status EXPIRED and schedule deletion per retention
-  const now = new Date();
-  const expired = await prisma.listing.findMany({ where: { expiresAt: { lt: now }, status: { not: 'EXPIRED' } } });
-  for (const l of expired) {
-    await prisma.listing.update({ where: { id: l.id }, data: { status: 'EXPIRED' } });
-    await prisma.auditLog.create({ data: { listingId: l.id, action: 'MARK_EXPIRED', details: {} } });
-    logger.info({ listingId: l.id }, 'Marked listing as EXPIRED');
-  }
-}, { connection });
+export function start() {
+  if (worker) return worker;
+  worker = startQueueWorker('renewal-cleanup', () => runRenewalExpire());
+  return worker;
+}
 
-new QueueEvents('renewal-cleanup', { connection }).on('failed', (e) => logger.error({ e }, 'Renewal cleanup failed'));
+export { worker as renewalCleanupWorker };

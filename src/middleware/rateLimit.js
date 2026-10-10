@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { config } from '../config/index.js';
 import { getRedis } from '../utils/redisClient.js';
 let RedisStore;
 try {
@@ -10,7 +11,10 @@ try {
 }
 
 function createLimiter(opts) {
-  const store = RedisStore ? new RedisStore({ sendCommand: (...args) => getRedis().call(...args) }) : undefined;
+  const redis = config.redis.connect ? getRedis() : null;
+  const store = RedisStore && redis
+    ? new RedisStore({ sendCommand: (...args) => redis.call(...args) })
+    : undefined;
   return rateLimit({ store, ...opts });
 }
 

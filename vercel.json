@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    { "path": "/api/internal/cron/renewal-cleanup", "schedule": "0 1 * * *" },
+    { "path": "/api/internal/cron/status-cleanup", "schedule": "0 2 * * *" },
+    { "path": "/api/internal/cron/moderation-cleanup", "schedule": "0 3 * * *" },
+    { "path": "/api/internal/cron/content-cleanup", "schedule": "0 4 * * *" },
+    { "path": "/api/internal/cron/blog-expiry", "schedule": "0 5 * * *" },
+    { "path": "/api/internal/cron/renewal-reminder", "schedule": "0 6 * * *" },
+    { "path": "/api/internal/cron/feedback-reminder", "schedule": "0 8 * * *" }
+  ]
+}

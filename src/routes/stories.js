@@ -1,9 +1,9 @@
 import express from 'express';
 import { storyController, updateStory, deleteStory } from '../controllers/storyController.js';
-import multer from 'multer';
+import { createUpload } from '../utils/upload.js';
 import { compressUploads } from '../middleware/compressUploads.js';
 
-const upload = multer({ dest: 'tmp/uploads' });
+const upload = createUpload('tmp/uploads');
 import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();

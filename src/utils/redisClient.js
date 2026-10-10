@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 
 let client;
 export function getRedis() {
+  if (!config.redis.connect) return null;
   if (!client) {
   const opts = { maxRetriesPerRequest: null, lazyConnect: false };
     // If username/password are provided separately, pass them in options.

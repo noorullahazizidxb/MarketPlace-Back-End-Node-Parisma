@@ -1,16 +1,18 @@
 // Prisma schema reflecting marketplace + property rental/sales platform with moderation, roles, representatives, notifications
-// Tools: MySQL provider (default) — set DATABASE_PROVIDER=sqlite for local SQLite development
-// NOTE: After creating this file run: npx prisma migrate dev --name init
 //
-// ── Local SQLite development ──────────────────────────────────────────────────
-// In .env:
+// Provider is selected from DATABASE_PROVIDER (mysql | postgresql | sqlite).
+// scripts/apply-db-provider.mjs rewrites the provider line below before generate/migrate.
+// The committed default is mysql so Docker and paid VPS builds stay unchanged.
+//
+//   DATABASE_PROVIDER=mysql
+//   DATABASE_URL="mysql://user:pass@host:3306/dbname"
+//
+//   DATABASE_PROVIDER=postgresql
+//   DATABASE_URL="postgresql://user:pass@host:5432/dbname"
+//   DATABASE_DIRECT_URL="postgresql://user:pass@host:5432/dbname"   # optional, for pooled hosts
+//
 //   DATABASE_PROVIDER=sqlite
 //   DATABASE_URL="file:./dev.db"
-//
-// ── MySQL / PostgreSQL production ─────────────────────────────────────────────
-// In .env:
-//   DATABASE_PROVIDER=mysql          (or postgresql)
-//   DATABASE_URL="mysql://user:pass@host:3306/dbname"
 // --------------------------------------------------
 
 // --------------------------------------------------
@@ -19,6 +21,11 @@
 
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 // --------------------------------------------------

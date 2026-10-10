@@ -16,14 +16,69 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
+function flag(name, fallback) {
+  return parseBoolean(process.env[name], fallback);
+}
+
+function normalizeRuntime(value) {
+  const runtime = String(value || 'server').trim().toLowerCase();
+  if (runtime === 'serverless' || runtime === 'vercel') return 'serverless';
+  return 'server';
+}
+
+function normalizeDatabaseProvider(value) {
+  const provider = String(value || 'mysql').trim().toLowerCase();
+  if (provider === 'postgres') return 'postgresql';
+  if (provider === 'postgresql' || provider === 'sqlite' || provider === 'mysql') return provider;
+  return 'mysql';
+}
+
+function normalizeStorageDriver(value) {
+  const driver = String(value || 'local').trim().toLowerCase();
+  if (driver === 's3') return 's3';
+  return 'local';
+}
+
+const runtime = normalizeRuntime(process.env.APP_RUNTIME);
+const databaseProvider = normalizeDatabaseProvider(process.env.DATABASE_PROVIDER);
+const redisExplicitlyOff = process.env.REDIS_URL === '';
+const workersEnabled = flag('ENABLE_WORKERS', runtime !== 'serverless') && !redisExplicitlyOff;
+const storageDriver = normalizeStorageDriver(process.env.STORAGE_DRIVER);
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
+  runtime,
+  database: {
+    provider: databaseProvider,
+  },
+  workers: {
+    enabled: workersEnabled,
+  },
+  websockets: {
+    enabled: flag('ENABLE_WEBSOCKETS', runtime !== 'serverless'),
+  },
+  storage: {
+    driver: storageDriver,
+    bucket: process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || '',
+    region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-1',
+    endpoint: process.env.S3_ENDPOINT || process.env.AWS_ENDPOINT || '',
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '',
+    publicBaseUrl: (process.env.S3_PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
+    forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE, Boolean(process.env.S3_ENDPOINT || process.env.AWS_ENDPOINT)),
+  },
+  cron: {
+    secret: process.env.CRON_SECRET || '',
+  },
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   redisUsername: process.env.REDIS_USERNAME || '',
   redisPassword: process.env.REDIS_PASSWORD || '',
+  redis: {
+    connect: !redisExplicitlyOff && (Boolean(process.env.REDIS_URL) || workersEnabled),
+  },
   elastic: {
-    enabled: parseBoolean(readEnv('ENABLE-ELASTIC-SEARCH', 'ENABLE_ELASTIC_SEARCH'), true),
+    enabled: parseBoolean(readEnv('ENABLE-ELASTIC-SEARCH', 'ENABLE_ELASTIC_SEARCH'), runtime !== 'serverless'),
     node: process.env.ELASTICSEARCH_NODE || 'https://localhost:9200',
     username: process.env.ELASTICSEARCH_USERNAME || '',
     password: process.env.ELASTICSEARCH_PASSWORD,
@@ -68,3 +123,21 @@ export const config = {
     blogExpiryCheckTime: process.env.DAILY_BLOG_EXPIRY_CHECK_TIME || '05:00',
   }
 };
+
+export function assertHostingConfig() {
+  const problems = [];
+  if (config.runtime === 'serverless' && config.database.provider === 'sqlite') {
+    problems.push('SQLite is not supported when APP_RUNTIME=serverless because the filesystem is ephemeral. Use DATABASE_PROVIDER=postgresql.');
+  }
+  if (config.runtime === 'serverless' && config.storage.driver !== 's3') {
+    problems.push('APP_RUNTIME=serverless requires STORAGE_DRIVER=s3.');
+  }
+  if (config.storage.driver === 's3' && !config.storage.bucket) {
+    problems.push('STORAGE_DRIVER=s3 requires S3_BUCKET.');
+  }
+  if (problems.length) {
+    const error = new Error(problems.join(' '));
+    error.status = 1;
+    throw error;
+  }
+}

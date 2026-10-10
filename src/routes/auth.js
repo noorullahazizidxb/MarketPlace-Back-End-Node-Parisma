@@ -1,11 +1,11 @@
 import express from 'express';
-import multer from 'multer';
+import { createUpload } from '../utils/upload.js';
 import { authController } from '../controllers/authController.js';
 import { attachAuth, requireAuth, requireRole } from '../middleware/auth.js';
 import { Roles } from '../constants/enums.js';
 
 const router = express.Router();
-const upload = multer({ dest: 'tmp/uploads' });
+const upload = createUpload('tmp/uploads');
 
 // role-specific public endpoints
 // accept any file field (normalised in controller) to be tolerant to client field name differences

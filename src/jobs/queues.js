@@ -20,6 +20,9 @@ export const QUEUES = {
 
 const connections = {};
 function getConnection() {
+  if (!config.redis.connect || !config.workers.enabled) {
+    throw new Error('Redis queues are disabled. Set ENABLE_WORKERS=true and REDIS_URL to use BullMQ.');
+  }
   if (!connections.primary) {
     const opts = { maxRetriesPerRequest: null, lazyConnect: false };
     if (config.redisUsername) opts.username = config.redisUsername;

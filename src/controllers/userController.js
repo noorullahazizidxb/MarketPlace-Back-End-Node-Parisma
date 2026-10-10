@@ -17,8 +17,8 @@ export const userController = {
 
       // move file from multer tmp to uploads/users/{userId}_{originalname}
       const uploadsDir = path.join('uploads', 'users');
-      const dest = await storage.saveTempTo(uploadsDir, req.file.path, `${userId}_${req.file.originalname}`);
-      const url = `/${dest}`;
+      const dest = await storage.saveTempTo(uploadsDir, req.file, `${userId}_${req.file.originalname}`);
+      const url = storage.publicUrl(dest);
       // delete previous photo if present
       const prev = (await prisma.user.findUnique({ where: { id: userId } })).photo;
       if (prev) await storage.deletePath(prev);

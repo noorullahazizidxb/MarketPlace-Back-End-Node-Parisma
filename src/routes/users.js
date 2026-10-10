@@ -1,12 +1,12 @@
 import express from 'express';
-import multer from 'multer';
+import { createUpload } from '../utils/upload.js';
 import { attachAuth, requireAuth, requireRole } from '../middleware/auth.js';
 import { Roles } from '../constants/enums.js';
 import { userController } from '../controllers/userController.js';
 import { compressUploads } from '../middleware/compressUploads.js';
 
 const router = express.Router();
-const upload = multer({ dest: 'tmp/uploads' });
+const upload = createUpload('tmp/uploads');
 router.get('/', attachAuth, requireAuth, requireRole(Roles.ADMIN), userController.list);
 // Follow a user (push the requesting user's id into the target user's followers array)
 router.get('/:id/follow', requireAuth, userController.follow);

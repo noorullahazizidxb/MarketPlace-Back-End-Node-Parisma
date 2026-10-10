@@ -43,7 +43,7 @@ export const renewService = {
     // Also increment legacy 'used' column numerically if it exists (compat with older schema / user expectation)
     let legacyUsedCount;
     try {
-      await prisma.$executeRaw`UPDATE ListingRenewToken SET used = used + 1 WHERE id = ${token.id}`;
+      await prisma.listingRenewToken.update({ where: { id: token.id }, data: { used: { increment: 1 } } });
       const refreshed = await prisma.listingRenewToken.findUnique({ where: { id: token.id } });
       if (refreshed && typeof refreshed.used !== 'undefined') legacyUsedCount = refreshed.used;
       // If renewCount missing (fallback path), adopt legacy used count as display value

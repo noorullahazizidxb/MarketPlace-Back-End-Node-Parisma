@@ -8,9 +8,9 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "migrate": "prisma migrate dev",
-    "generate": "prisma generate",
-    "postinstall": "prisma generate",
+    "migrate": "node scripts/apply-db-provider.mjs && prisma migrate dev",
+    "generate": "node scripts/apply-db-provider.mjs && prisma generate",
+    "postinstall": "node scripts/apply-db-provider.mjs && prisma generate",
     "lint": "eslint .",
     "format": "prettier --write .",
     "reindex:all": "node scripts/reindex-search.js",
@@ -28,9 +28,9 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1149.0",
     "@elastic/elasticsearch": "^8.13.0",
     "@prisma/client": "6.19.3",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
     "bullmq": "^5.58.5",
@@ -45,6 +45,7 @@
     "mysql2": "^3.11.0",
     "nanoid": "^5.1.5",
     "nodemailer": "9.0.3",
+    "pg": "^8.23.1",
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
     "rate-limit-redis": "^4.2.2",

@@ -33,8 +33,8 @@ export const authController = {
     if (req.file) {
       // try to move temp upload to permanent location
       try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        const dest = await storage.saveTempTo('uploads/users', req.file, req.file.originalname || 'photo');
+        payload.photo = storage.publicUrl(dest);
       } catch (e) {
         // fallback: store temp path reference
         payload.photo = `/${req.file.path}`;
@@ -86,8 +86,8 @@ export const authController = {
     if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
     if (req.file) {
       try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        const dest = await storage.saveTempTo('uploads/users', req.file, req.file.originalname || 'photo');
+        payload.photo = storage.publicUrl(dest);
       } catch (e) {
         payload.photo = `/${req.file.path}`;
       }
@@ -128,8 +128,8 @@ export const authController = {
     if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
     if (req.file) {
       try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+        const dest = await storage.saveTempTo('uploads/users', req.file, req.file.originalname || 'photo');
+        payload.photo = storage.publicUrl(dest);
       } catch (e) {
         payload.photo = `/${req.file.path}`;
       }

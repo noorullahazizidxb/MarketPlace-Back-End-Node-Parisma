@@ -23,8 +23,8 @@ export const storyController = {
           for (let i = 0; i < req.files.length; i++) {
             const f = req.files[i];
             try {
-              const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
-              const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+              const dest = await storage.saveTempTo(uploadsDir, f, f.originalname || `img_${i}`);
+              const url = storage.publicUrl(dest);
               urls.push(url);
             } catch (e) {
               logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded story image');
@@ -92,8 +92,8 @@ export async function updateStory(req, res) {
         for (let i = 0; i < req.files.length; i++) {
           const f = req.files[i];
           try {
-            const dest = await storage.saveTempTo(uploadsDir, f.path, f.originalname || `img_${i}`);
-            const url = `/${dest.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+            const dest = await storage.saveTempTo(uploadsDir, f, f.originalname || `img_${i}`);
+            const url = storage.publicUrl(dest);
             urls.push(url);
           } catch (e) {
             logger.warn({ err: e?.message, file: f.originalname }, 'Failed to persist uploaded story image on update');

@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { boolIsTrue, channelCount, dayExpr, hourDiffExpr, monthExpr, q, sinceDays, sinceMonths, sinceWeeks, sinceYears, yearExpr, yearWeekExpr } from '../db/dialect.js';
 
 function formatDate(date) {
   if (!date) return '';
@@ -36,8 +37,8 @@ function fillSeries(baseDates, rows, keyMap) {
 
 export const reportService = {
   async listingsDaily(days = 30) {
-    const rowsCreated = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    const rowsApproved = await prisma.$queryRaw`SELECT DATE_FORMAT(approvedAt, '%Y-%m-%d') d, COUNT(*) c FROM Listing WHERE approvedAt IS NOT NULL AND approvedAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
+    const rowsCreated = await prisma.$queryRaw`SELECT ${dayExpr('createdAt')} d, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('createdAt')} ORDER BY ${dayExpr('createdAt')}`;
+    const rowsApproved = await prisma.$queryRaw`SELECT ${dayExpr('approvedAt')} d, COUNT(*) c FROM ${q('Listing')} WHERE ${q('approvedAt')} IS NOT NULL AND ${q('approvedAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('approvedAt')} ORDER BY ${dayExpr('approvedAt')}`;
     const rowsByDate = {};
     for (const r of rowsCreated) rowsByDate[r.d] = { date: r.d, created: Number(r.c) };
     for (const r of rowsApproved) {
@@ -48,15 +49,15 @@ export const reportService = {
     return baseDates.map(d => ({ date: d, created: rowsByDate[d]?.created || 0, approved: rowsByDate[d]?.approved || 0 }));
   },
   async listingsMonthly(months = 12) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m') ym, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH) GROUP BY ym ORDER BY ym`;
+    const rows = await prisma.$queryRaw`SELECT ${monthExpr('createdAt')} ym, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceMonths(months)} GROUP BY ${monthExpr('createdAt')} ORDER BY ${monthExpr('createdAt')}`;
     return rows.map(r => ({ month: r.ym, created: Number(r.c) }));
   },
   async usersDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) c FROM User WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
+    const rows = await prisma.$queryRaw`SELECT ${dayExpr('createdAt')} d, COUNT(*) c FROM ${q('User')} WHERE ${q('createdAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('createdAt')} ORDER BY ${dayExpr('createdAt')}`;
     return fillSeries(dateRangeDays(days), rows, { registered: 'c' });
   },
   async feedbackDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) feedbackCount, AVG(rating) avgRating FROM ListingFeedback WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
+    const rows = await prisma.$queryRaw`SELECT ${dayExpr('createdAt')} d, COUNT(*) feedbackCount, AVG(${q('rating')}) avgRating FROM ${q('ListingFeedback')} WHERE ${q('createdAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('createdAt')} ORDER BY ${dayExpr('createdAt')}`;
     const base = dateRangeDays(days);
     const map = new Map(rows.map(r => [r.d, r]));
     return base.map(d => {
@@ -65,7 +66,7 @@ export const reportService = {
     });
   },
   async notificationsDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) total, SUM(channel='EMAIL') emailCount, SUM(channel='WHATSAPP') whatsappCount, SUM(channel='SYSTEM') systemCount FROM Notification WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
+    const rows = await prisma.$queryRaw`SELECT ${dayExpr('createdAt')} d, COUNT(*) total, ${channelCount('EMAIL')} emailCount, ${channelCount('WHATSAPP')} whatsappCount, ${channelCount('SYSTEM')} systemCount FROM ${q('Notification')} WHERE ${q('createdAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('createdAt')} ORDER BY ${dayExpr('createdAt')}`;
     const base = dateRangeDays(days);
     const map = new Map(rows.map(r => [r.d, r]));
     return base.map(d => {
@@ -74,11 +75,11 @@ export const reportService = {
     });
   },
   async approvalTimeDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(approvedAt, '%Y-%m-%d') d, AVG(TIMESTAMPDIFF(HOUR, createdAt, approvedAt)) avgHours FROM Listing WHERE approvedAt IS NOT NULL AND approvedAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
+    const rows = await prisma.$queryRaw`SELECT ${dayExpr('approvedAt')} d, AVG(${hourDiffExpr('createdAt', 'approvedAt')}) avgHours FROM ${q('Listing')} WHERE ${q('approvedAt')} IS NOT NULL AND ${q('approvedAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('approvedAt')} ORDER BY ${dayExpr('approvedAt')}`;
     return fillSeries(dateRangeDays(days), rows, { avgHours: 'avgHours' });
   },
   async representativesByRegion(limit = 20) {
-    const rows = await prisma.$queryRaw`SELECT region, COUNT(*) c FROM RepresentativeInfo WHERE active = 1 GROUP BY region ORDER BY c DESC LIMIT ${limit}`;
+    const rows = await prisma.$queryRaw`SELECT ${q('region')} region, COUNT(*) c FROM ${q('RepresentativeInfo')} WHERE ${boolIsTrue('active')} GROUP BY ${q('region')} ORDER BY c DESC LIMIT ${Number(limit) || 20}`;
     return rows.map(r => ({ region: r.region, count: Number(r.c) }));
   },
   async summary() {
@@ -88,7 +89,7 @@ export const reportService = {
       prisma.listing.count({ where: { status: 'APPROVED' } }),
       prisma.user.count(),
       prisma.listingFeedback.count(),
-      prisma.$queryRaw`SELECT AVG(rating) avgRating FROM ListingFeedback WHERE rating IS NOT NULL`
+      prisma.$queryRaw`SELECT AVG(${q('rating')}) avgRating FROM ${q('ListingFeedback')} WHERE ${q('rating')} IS NOT NULL`
     ]);
     const avgRating = Array.isArray(avgRatingRow) ? (avgRatingRow[0]?.avgRating ? Number(Number(avgRatingRow[0].avgRating).toFixed(2)) : 0) : 0;
     return { totalListings, pendingListings: pending, approvedListings: approved, totalUsers, feedbackCount, avgRating };
@@ -152,13 +153,13 @@ function pivotTypeStatusRows(rows, keyField) {
 }
 
 reportService._listingsTypeStatusDaily = async function(days = 30) {
-  const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d, listingType, status ORDER BY d`;
+  const rows = await prisma.$queryRaw`SELECT ${dayExpr('createdAt')} d, ${q('listingType')} listingType, ${q('status')} status, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceDays(days)} GROUP BY ${dayExpr('createdAt')}, ${q('listingType')}, ${q('status')} ORDER BY ${dayExpr('createdAt')}`;
   return pivotTypeStatusRows(rows.map(r => ({ ...r, day: r.d })), 'day');
 };
 
 reportService._listingsTypeStatusWeekly = async function(weeks = 12) {
   // YEARWEEK returns e.g. 202540 for week 40 of 2025; format to YYYY-Www for readability
-  const rows = await prisma.$queryRaw`SELECT YEARWEEK(createdAt, 1) yw, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${weeks} WEEK) GROUP BY yw, listingType, status ORDER BY yw`;
+  const rows = await prisma.$queryRaw`SELECT ${yearWeekExpr('createdAt')} yw, ${q('listingType')} listingType, ${q('status')} status, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceWeeks(weeks)} GROUP BY ${yearWeekExpr('createdAt')}, ${q('listingType')}, ${q('status')} ORDER BY ${yearWeekExpr('createdAt')}`;
   const normalized = rows.map(r => {
     const yw = String(r.yw); // e.g., 202540
     const year = yw.slice(0,4);
@@ -169,13 +170,13 @@ reportService._listingsTypeStatusWeekly = async function(weeks = 12) {
 };
 
 reportService._listingsTypeStatusMonthly = async function(months = 12) {
-  const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m') ym, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH) GROUP BY ym, listingType, status ORDER BY ym`;
+  const rows = await prisma.$queryRaw`SELECT ${monthExpr('createdAt')} ym, ${q('listingType')} listingType, ${q('status')} status, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceMonths(months)} GROUP BY ${monthExpr('createdAt')}, ${q('listingType')}, ${q('status')} ORDER BY ${monthExpr('createdAt')}`;
   const normalized = rows.map(r => ({ month: r.ym, listingType: r.listingType, status: r.status, c: r.c }));
   return pivotTypeStatusRows(normalized, 'month');
 };
 
 reportService._listingsTypeStatusYearly = async function(years = 5) {
-  const rows = await prisma.$queryRaw`SELECT YEAR(createdAt) y, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${years} YEAR) GROUP BY y, listingType, status ORDER BY y`;
+  const rows = await prisma.$queryRaw`SELECT ${yearExpr('createdAt')} y, ${q('listingType')} listingType, ${q('status')} status, COUNT(*) c FROM ${q('Listing')} WHERE ${q('createdAt')} >= ${sinceYears(years)} GROUP BY ${yearExpr('createdAt')}, ${q('listingType')}, ${q('status')} ORDER BY ${yearExpr('createdAt')}`;
   const normalized = rows.map(r => ({ year: String(r.y), listingType: r.listingType, status: r.status, c: r.c }));
   return pivotTypeStatusRows(normalized, 'year');
 };

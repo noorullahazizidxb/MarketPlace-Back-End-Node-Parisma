@@ -27,6 +27,7 @@ COPY <<'EOF' /usr/local/bin/entrypoint.sh
 set -eu
 cd /srv/backend
 
+node scripts/apply-db-provider.mjs
 npx prisma generate
 npx prisma migrate deploy
 

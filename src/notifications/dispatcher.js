@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
-import { queues } from '../jobs/queues.js';
-import { QUEUES } from '../jobs/queues.js';
+import { config } from '../config/index.js';
+import { queues, QUEUES } from '../jobs/queues.js';
+import { runNotificationDispatch } from '../jobs/handlers.js';
 import { logger } from '../utils/logger.js';
 
 export async function createNotification({ title, message, channel = 'SYSTEM', targetType = 'USER', senderId = null, listingId = null, recipientUserIds = [], role = null }) {
@@ -19,9 +20,14 @@ export async function createNotification({ title, message, channel = 'SYSTEM', t
 
   const n = await prisma.notification.create({ data: createData });
 
-  // enqueue dispatch job
-  await queues[QUEUES.NOTIFICATION_DISPATCH].add('dispatch', { notificationId: n.id });
-  logger.info({ notificationId: n.id }, 'Created notification and enqueued dispatch');
+  const queue = queues[QUEUES.NOTIFICATION_DISPATCH];
+  if (config.workers.enabled && typeof queue?.add === 'function') {
+    await queue.add('dispatch', { notificationId: n.id });
+    logger.info({ notificationId: n.id }, 'Created notification and enqueued dispatch');
+  } else {
+    await runNotificationDispatch({ notificationId: n.id });
+    logger.info({ notificationId: n.id }, 'Created notification and dispatched inline');
+  }
 
   // emit to recipient users via websocket (fire-and-forget)
   try {

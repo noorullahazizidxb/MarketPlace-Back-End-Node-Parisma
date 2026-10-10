@@ -3,9 +3,43 @@ import path from 'path';
 import sharp from 'sharp';
 import { logger } from '../utils/logger.js';
 
+function outputBuffer(image, mimetype) {
+  if (mimetype.includes('jpeg') || mimetype.includes('jpg')) return image.jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+  if (mimetype.includes('png')) return image.png({ compressionLevel: 9, adaptiveFiltering: true, palette: true }).toBuffer();
+  if (mimetype.includes('webp')) return image.webp({ quality: 78 }).toBuffer();
+  if (mimetype.includes('avif')) return image.avif({ quality: 50 }).toBuffer();
+  return null;
+}
+
+function resized(image, meta) {
+  const maxDim = 2000;
+  if ((meta.width && meta.width > maxDim) || (meta.height && meta.height > maxDim)) {
+    image.resize({ width: meta.width > meta.height ? maxDim : undefined, height: meta.height >= meta.width ? maxDim : undefined, fit: 'inside', withoutEnlargement: true });
+  }
+  return image;
+}
+
+async function compressBuffer(file) {
+  const { mimetype } = file;
+  if (!mimetype || !mimetype.startsWith('image/') || mimetype.includes('gif') || !file.buffer) return;
+  try {
+    let image = sharp(file.buffer).rotate();
+    const meta = await image.metadata().catch(() => ({}));
+    image = resized(image, meta);
+    const out = await outputBuffer(image, mimetype);
+    if (!out) return;
+    file.buffer = out;
+    file.size = out.length;
+  } catch (e) {
+    logger.warn({ err: e?.message }, 'Failed to compress uploaded image buffer');
+  }
+}
+
 // Compress a single multer file in-place by writing to a temp file and swapping paths
 async function compressOne(file) {
-  if (!file || !file.path) return;
+  if (!file) return;
+  if (file.buffer && !file.path) return compressBuffer(file);
+  if (!file.path) return;
   const { mimetype } = file;
   if (!mimetype || !mimetype.startsWith('image/')) return; // skip non-images
 

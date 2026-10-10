@@ -1,9 +1,9 @@
 import { getRedis } from './redisClient.js';
 import { cache } from './cache.js';
 
-const redis = getRedis();
-
 export async function redisGet(key) {
+  const redis = getRedis();
+  if (!redis) return cache.get(key) ?? null;
   try {
     const v = await redis.get(key);
     if (!v) return null;
@@ -14,6 +14,11 @@ export async function redisGet(key) {
 }
 
 export async function redisSet(key, value, ttlSec = 30) {
+  const redis = getRedis();
+  if (!redis) {
+    cache.set(key, value);
+    return;
+  }
   try {
     await redis.set(key, JSON.stringify(value), 'EX', Math.max(1, ttlSec));
   } catch (e) {
@@ -23,6 +28,11 @@ export async function redisSet(key, value, ttlSec = 30) {
 }
 
 export async function redisDel(key) {
+  const redis = getRedis();
+  if (!redis) {
+    cache.del(key);
+    return;
+  }
   try {
     await redis.del(key);
   } catch (e) {

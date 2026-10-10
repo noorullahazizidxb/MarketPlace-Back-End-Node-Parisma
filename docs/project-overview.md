@@ -1,7 +1,7 @@
 # MarketPlace Back-End — Project Overview
 
 > Last updated: 2025
-> Node.js (ESM) · Express · Prisma (MySQL) · BullMQ (Redis) · Socket.io · Elasticsearch
+> Node.js (ESM) · Express · Prisma (MySQL, PostgreSQL, or SQLite) · BullMQ (Redis) · Socket.io · Elasticsearch
 
 ---
 
@@ -86,7 +86,7 @@ The application is a **single Express process** that:
 | ------- | ----------- |
 | Runtime | Node.js 18+ with ES Modules (`"type": "module"`) |
 | HTTP Framework | Express 5 |
-| ORM | Prisma (MySQL) |
+| ORM | Prisma (MySQL, PostgreSQL, or SQLite via `DATABASE_PROVIDER`) |
 | Queue/Jobs | BullMQ backed by Redis (ioredis) |
 | Real-time | Socket.io |
 | Search | Elasticsearch 8 (optional, falls back to DB) |
@@ -181,7 +181,28 @@ src/
 | ---------- | --------- | ------------- |
 | `NODE_ENV` | `development` | Runtime environment |
 | `PORT` | `4000` | HTTP server port |
-| `DATABASE_URL` | — | Prisma MySQL connection string |
+| `DATABASE_PROVIDER` | `mysql` | `mysql` (Docker/VPS default), `postgresql`, or `sqlite` |
+| `DATABASE_URL` | — | Connection string for the selected provider |
+| `DATABASE_DIRECT_URL` | — | Optional unpooled Postgres URL for migrations |
+| `APP_RUNTIME` | `server` | `server` (long-lived process) or `serverless` (Vercel-style) |
+| `ENABLE_WORKERS` | on for `server` | BullMQ workers and Redis queues |
+| `ENABLE_WEBSOCKETS` | on for `server` | Socket.io on the HTTP server |
+| `STORAGE_DRIVER` | `local` | `local` disk or `s3` object storage |
+| `CRON_SECRET` | — | Bearer token for `/api/internal/cron/:name` |
+
+### Hosting profiles
+
+The same process is configured entirely from the environment. Defaults match the existing Docker / paid VPS stack: MySQL, local uploads, Redis workers, and WebSockets.
+
+| Profile | Typical host | Required settings |
+| --- | --- | --- |
+| Paid VPS / Docker | This repo's Compose files | `DATABASE_PROVIDER=mysql`, `APP_RUNTIME=server`. Compose does not need new variables. |
+| Long-running free tier | Render, Railway, Fly | `DATABASE_PROVIDER=postgresql` or `sqlite`, `node src/index.js`. Redis is optional: set `ENABLE_WORKERS=false` or leave `REDIS_URL` empty to skip queues. |
+| Serverless | Vercel | `APP_RUNTIME=serverless`, `DATABASE_PROVIDER=postgresql`, `STORAGE_DRIVER=s3`, `ENABLE_WORKERS=false`, `ENABLE_WEBSOCKETS=false`. `api/index.js` exports the Express app. `vercel.json` calls `/api/internal/cron/:name` with `Authorization: Bearer $CRON_SECRET`. |
+
+SQLite is for local development and a single machine with a real disk. Serverless startup refuses `DATABASE_PROVIDER=sqlite` because the function filesystem is ephemeral. Use PostgreSQL (Neon, Supabase, or Vercel Postgres) there.
+
+`scripts/apply-db-provider.mjs` rewrites the Prisma datasource before `prisma generate` and `prisma migrate`. MySQL migrations stay in `prisma/migrations`. PostgreSQL and SQLite use `prisma/migrations-postgresql` and `prisma/migrations-sqlite`. The committed schema provider remains `mysql`. SQLite cannot use `@db.Text` or `@db.Decimal`; the script strips those annotations only when `DATABASE_PROVIDER=sqlite`. `DATABASE_PROVIDER` must be set when the client is generated (install or image start), because Prisma bakes the provider into the client.
 
 ### Redis / BullMQ
 

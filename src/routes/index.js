@@ -16,6 +16,7 @@ import storiesRouter from './stories.js';
 import blogsRouter from './blogs.js';
 import contactsRouter from './contacts.js';
 import publicRouter from './public.js';
+import internalCronRouter from './internalCron.js';
 
 export function registerRoutes(app, upload) {
   const api = express.Router();
@@ -42,6 +43,7 @@ export function registerRoutes(app, upload) {
   api.use('/stories', (req, res, next) => { res.locals.entityName = 'Story'; next(); }, storiesRouter);
   api.use('/blogs', (req, res, next) => { res.locals.entityName = 'Blog'; next(); }, blogsRouter);
   api.use('/contacts', (req, res, next) => { res.locals.entityName = 'Contact'; next(); }, contactsRouter);
+  api.use('/internal/cron', (req, res, next) => { res.locals.entityName = 'Cron'; next(); }, internalCronRouter);
 
   app.use('/api', api);
 }

@@ -18,7 +18,7 @@ COPY src ./src
 COPY scripts ./scripts
 COPY dummydata ./dummydata
 RUN mkdir -p uploads/profile uploads/services
-RUN npx prisma generate
+RUN node scripts/apply-db-provider.mjs && npx prisma generate
 
 EXPOSE 4000
 CMD ["npm", "run", "start"]
