@@ -79,4 +79,12 @@ Attach **custom domain only to the Next.js project**. Set `BACKEND_VERCEL_URL` t
 
 ## 5. DNS
 
-Point `marketplace.devminds.net` at the **frontend** Vercel project. Do not attach the same domain to the API project.
+`marketplace.devminds.net` is attached only to the Next.js project `marketplace-web`. Leave Hostinger nameservers on `ns1.dns-parking.com` and `ns2.dns-parking.com`.
+
+In hPanel → DNS zone for `devminds.net`, replace the existing `marketplace` record (it currently CNAMEs to `devminds.net`) with:
+
+- Type: `CNAME`
+- Name: `marketplace`
+- Target: `89a67bd7c8fcc305.vercel-dns-017.com`
+
+Then run `npx vercel domains verify marketplace.devminds.net`.
