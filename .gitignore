@@ -13,6 +13,7 @@ yarn-error.log*
 .env
 .env.local
 .env.vercel.local
+.vercel
 .stack.lock
 *.db
 dev.db
@@ -58,3 +59,5 @@ coverage/
 /temp-folder-to-ignore/
 # Example: ignore a specific file
 /path/to/ignore-me.txt
+.vercel
+.env*
