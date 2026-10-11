@@ -29,3 +29,11 @@ Redis and Elasticsearch remain optional: set `REDIS_ENABLED=false` / `SEARCH_ENA
 Health: `http://localhost:4000/api/health`
 
 See also the existing Docker notes in `deployment/` and `MarketPlace-Next-JS/docker-configuration/`.
+
+## Paid VPS cutover
+
+Docker Compose stays on MySQL, Redis, and Socket.IO. Pointing the live domain at that host is an env and DNS change:
+
+- API: `HOSTING_PLATFORM=local`, `DB_PROVIDER=mysql`, `DATABASE_URL=mysql://…`, `REDIS_ENABLED=true`, `SOCKET_IO_ENABLED=true`
+- Web image build args: `NEXT_PUBLIC_API_BASE=https://marketplace.devminds.net/api`, `NEXT_PUBLIC_SOCKET_IO_ENABLED=true`
+- DNS at Hostinger: remove the Vercel CNAME for `marketplace` and add an A record to the VPS address. Nginx on that host serves the site.

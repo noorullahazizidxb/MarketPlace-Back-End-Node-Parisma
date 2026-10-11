@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY vendor ./vendor
+COPY scripts/prisma-generate.mjs ./scripts/prisma-generate.mjs
 RUN npm ci
 
 FROM node:20-bookworm-slim AS runner

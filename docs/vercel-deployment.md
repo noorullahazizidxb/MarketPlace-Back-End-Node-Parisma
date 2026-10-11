@@ -41,14 +41,12 @@ npm run dev:vercel
 
 ```bash
 export DB_PROVIDER=postgresql
-export DATABASE_URL='postgresql://USER:PASSWORD@HOST/dbname?sslmode=require'
-npx prisma generate
-npx prisma migrate deploy
+export DATABASE_URL='postgresql://USER:PASSWORD@HOST-pooler/dbname?sslmode=require'
+export DIRECT_URL='postgresql://USER:PASSWORD@HOST/dbname?sslmode=require'
+bash scripts/prisma-migrate.sh
 # optional:
 npm run seed:all
 ```
-
-Or: `bash scripts/prisma-migrate.sh`
 
 ## 3. Deploy the backend (this repo)
 
@@ -60,13 +58,14 @@ In Vercel → **Settings → Environment Variables**, paste [`.env.vercel.exampl
 
 - `HOSTING_PLATFORM=vercel`
 - `DB_PROVIDER=postgresql`
-- `DATABASE_URL` = Neon URL
+- `DATABASE_URL` = Neon pooled URL (`-pooler` host)
+- `DIRECT_URL` = Neon direct URL (no `-pooler`)
 - `TOKEN_SECRET` / `JWT_SECRET`
 - `CORS_ORIGIN=https://marketplace.devminds.net`
 - `CRON_SECRET` (Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`)
 - `BLOB_READ_WRITE_TOKEN` optional for persistent uploads
 
-Build: `npm run build` (`prisma generate`). Entry: `api/index.js`. Daily cleanup: cron `GET /api/maintenance/cleanup-expired`.
+Build: `npm run build` (generates the Postgres client from `prisma/postgres/schema.prisma` when `DB_PROVIDER=postgresql`). Entry: `api/index.js`. Daily cleanup: cron `GET /api/maintenance/cleanup-expired`.
 
 ## 4. Deploy the frontend
 

@@ -16,8 +16,15 @@ fi
 PROVIDER="${DB_PROVIDER:-mysql}"
 echo "DB_PROVIDER=$PROVIDER"
 
-npx prisma generate
-npx prisma migrate deploy
+if [[ "$PROVIDER" == "postgresql" || "$PROVIDER" == "postgres" ]]; then
+  SCHEMA="prisma/postgres/schema.prisma"
+else
+  SCHEMA="prisma/schema.prisma"
+fi
+echo "schema=$SCHEMA"
+
+npx prisma generate --schema "$SCHEMA"
+npx prisma migrate deploy --schema "$SCHEMA"
 
 if [[ "${1:-}" == "--seed" ]]; then
   npm run seed:all || true

@@ -292,10 +292,14 @@ function cfgFromEnv(env) {
 async function prismaSetup(envValues, seed) {
   applyEnv(envValues);
   const childEnv = { ...process.env, ...envValues };
-  console.log(`\nGenerating Prisma client (${envValues.DB_PROVIDER})...`);
-  await run('npx', ['prisma', 'generate'], { env: childEnv });
+  const provider = String(envValues.DB_PROVIDER || 'mysql').toLowerCase();
+  const schema = provider === 'postgresql' || provider === 'postgres'
+    ? 'prisma/postgres/schema.prisma'
+    : 'prisma/schema.prisma';
+  console.log(`\nGenerating Prisma client (${provider}) from ${schema}...`);
+  await run('npx', ['prisma', 'generate', '--schema', schema], { env: childEnv });
   console.log('Applying migrations...');
-  await run('npx', ['prisma', 'migrate', 'deploy'], { env: childEnv });
+  await run('npx', ['prisma', 'migrate', 'deploy', '--schema', schema], { env: childEnv });
   if (seed) {
     console.log('Seeding database...');
     try {

@@ -9,6 +9,7 @@ WORKDIR /srv/backend
 # ── deps ───────────────────────────────────────────────────────────────────
 FROM base AS deps
 COPY package*.json ./
+COPY scripts/prisma-generate.mjs ./scripts/prisma-generate.mjs
 RUN npm ci --omit=dev
 
 # ── source ─────────────────────────────────────────────────────────────────
