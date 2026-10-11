@@ -569,25 +569,35 @@ async function sortedFiles(dirPath) {
   }
 }
 
-async function copyScopedImage(scope, entityId, fileName) {
-  const sourcePath = path.join(listingImageDir, fileName);
-  const destinationDir = path.join(uploadsRoot, scope, entityId);
+async function publishImage(scope, entityId, sourcePath, fileName) {
   const destinationName = sanitizeFileName(fileName);
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (token) {
+    const { put } = await import('@vercel/blob');
+    const data = await fs.readFile(sourcePath);
+    const blob = await put(`uploads/${scope}/${entityId}/${destinationName}`, data, {
+      access: 'public',
+      token,
+      addRandomSuffix: false,
+    });
+    return blob.url;
+  }
+
+  const destinationDir = path.join(uploadsRoot, scope, entityId);
   const destinationPath = path.join(destinationDir, destinationName);
   await fs.mkdir(destinationDir, { recursive: true });
   await fs.copyFile(sourcePath, destinationPath);
   return `/uploads/${scope}/${entityId}/${destinationName}`;
 }
 
+async function copyScopedImage(scope, entityId, fileName) {
+  return publishImage(scope, entityId, path.join(listingImageDir, fileName), fileName);
+}
+
 async function copyProfileImage(userId, fileName) {
-  const sourcePath = path.join(profileImageDir, fileName);
   const extension = path.extname(fileName) || '.jpg';
-  const destinationDir = path.join(uploadsRoot, 'users');
   const destinationName = sanitizeFileName(`${userId}${extension.toLowerCase()}`);
-  const destinationPath = path.join(destinationDir, destinationName);
-  await fs.mkdir(destinationDir, { recursive: true });
-  await fs.copyFile(sourcePath, destinationPath);
-  return `/uploads/users/${destinationName}`;
+  return publishImage('users', userId, path.join(profileImageDir, fileName), destinationName);
 }
 
 async function cleanupExistingData() {
@@ -635,7 +645,11 @@ function buildStoryDescription(user, listing, location) {
 async function main() {
   console.log('Seeding curated marketplace data...');
 
-  await cleanupExistingData();
+  const existingListings = await prisma.listing.count();
+  if (existingListings > 0) {
+    console.log(`Seed skipped: ${existingListings} listings already exist.`);
+    return;
+  }
 
   const passwordHash = await hashPassword(defaultPassword);
   const profileImages = await sortedFiles(profileImageDir);
@@ -647,52 +661,68 @@ async function main() {
     const source = userSeed[index];
     const location = afghanLocations[index];
     const fullName = `${source.firstName} ${source.lastName}`.trim();
-    const createdUser = await prisma.user.create({
-      data: {
-        email: source.email,
-        phone: source.phone,
-        firstName: source.firstName,
-        lastName: source.lastName,
-        fullName,
-        passwordHash,
-        contacts: {
-          phone: source.phone,
-          whatsapp: source.phone,
-          telegram: source.phone,
-        },
-        address: userAddress(location),
-        followers: [],
-        metadata: {
-          preferredLanguage: index % 2 === 0 ? 'fa' : 'en',
-          onboardingStatus: 'verified',
-          city: location.city,
-          province: location.province,
-          isSeedAccount: true,
-        },
-      },
-    });
+    let createdUser = source.email
+      ? await prisma.user.findUnique({ where: { email: source.email } })
+      : null;
 
-    if (profileImages.length > 0) {
+    if (createdUser) {
+      console.log(`Keeping existing user ${source.email}`);
+    } else {
+      createdUser = await prisma.user.create({
+        data: {
+          email: source.email,
+          phone: source.phone,
+          firstName: source.firstName,
+          lastName: source.lastName,
+          fullName,
+          passwordHash,
+          contacts: {
+            phone: source.phone,
+            whatsapp: source.phone,
+            telegram: source.phone,
+          },
+          address: userAddress(location),
+          followers: [],
+          metadata: {
+            preferredLanguage: index % 2 === 0 ? 'fa' : 'en',
+            onboardingStatus: 'verified',
+            city: location.city,
+            province: location.province,
+            isSeedAccount: true,
+          },
+        },
+      });
+    }
+
+    if (profileImages.length > 0 && !createdUser.photo) {
       const photo = await copyProfileImage(createdUser.id, profileImages[index % profileImages.length]);
       await prisma.user.update({ where: { id: createdUser.id }, data: { photo } });
       createdUser.photo = photo;
     }
 
-    await prisma.userRole.create({
-      data: {
-        userId: createdUser.id,
-        role: roleForIndex(index),
-      },
+    const role = roleForIndex(index);
+    const existingRole = await prisma.userRole.findUnique({
+      where: { userId_role: { userId: createdUser.id, role } },
     });
+    if (!existingRole) {
+      await prisma.userRole.create({
+        data: { userId: createdUser.id, role },
+      });
+    }
 
-    const representative = await prisma.representativeInfo.create({
-      data: {
-        userId: createdUser.id,
-        region: location.province,
-        whatsappNumber: source.phone,
-        active: index < 8,
-      },
+    let representative = await prisma.representativeInfo.findFirst({
+      where: { userId: createdUser.id },
     });
+    if (!representative) {
+      representative = await prisma.representativeInfo.create({
+        data: {
+          userId: createdUser.id,
+          region: location.province,
+          whatsappNumber: source.phone,
+          active: index < 8,
+        },
+      });
+    }
 
     users.push(createdUser);
     representatives.push(representative);
@@ -700,11 +730,14 @@ async function main() {
 
   const categories = new Map();
   for (const category of categorySeed) {
-    const createdCategory = await prisma.category.create({
-      data: {
+    const parentId = category.parentSlug ? categories.get(category.parentSlug).id : null;
+    const createdCategory = await prisma.category.upsert({
+      where: { slug: category.slug },
+      update: { name: category.name, parentId, isActive: true },
+      create: {
         name: category.name,
         slug: category.slug,
-        parentId: category.parentSlug ? categories.get(category.parentSlug).id : null,
+        parentId,
         isActive: true,
       },
     });
@@ -993,8 +1026,8 @@ async function main() {
   console.log(`  Blogs: ${blogSeed.length}`);
   console.log(`  Contacts: ${contactMessages.length}`);
   console.log(`  Ads: 20`);
-  console.log(`  Default password for seeded accounts: ${defaultPassword}`);
   console.log(`  Admin email: ${adminEmail}`);
+  console.log('  Seeded account passwords match SEED_USER_PASSWORD.');
 }
 
 main()
