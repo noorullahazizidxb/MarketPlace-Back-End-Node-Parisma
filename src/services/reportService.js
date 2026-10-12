@@ -1,86 +1,246 @@
 import { prisma } from '../config/prisma.js';
+import { logger } from '../utils/logger.js';
 
-function formatDate(date) {
-  if (!date) return '';
-  if (typeof date === 'string') {
-    // Already a string; attempt to standardize (assumes first 10 chars are YYYY-MM-DD when ISO)
-    return date.length >= 10 ? date.slice(0, 10) : date;
-  }
-  return date.toISOString().slice(0,10); // YYYY-MM-DD
+const LISTING_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'SOLD', 'RENTED', 'EXPIRED', 'DRAFT', 'HIDDEN'];
+const MS_PER_HOUR = 1000 * 60 * 60;
+
+const EMPTY_SUMMARY = {
+  totalListings: 0,
+  pendingListings: 0,
+  approvedListings: 0,
+  totalUsers: 0,
+  feedbackCount: 0,
+  avgRating: 0,
+};
+
+function utcDayKey(date) {
+  return new Date(date).toISOString().slice(0, 10);
 }
 
-function dateRangeDays(days) {
-  const out = [];
-  const today = new Date();
-  // ensure last day is today
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    out.push(formatDate(d));
-  }
-  return out;
+function utcMonthKey(date) {
+  return utcDayKey(date).slice(0, 7);
 }
 
-function fillSeries(baseDates, rows, keyMap) {
-  const byDate = new Map();
-  for (const r of rows) byDate.set(r.d, r);
-  return baseDates.map(d => {
-    const src = byDate.get(d) || {};
-    const obj = { date: d };
-    for (const [targetKey, sourceKey] of Object.entries(keyMap)) {
-      obj[targetKey] = src[sourceKey] !== undefined && src[sourceKey] !== null ? Number(src[sourceKey]) : 0;
+function startOfUtcDay(offsetDays = 0) {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offsetDays));
+}
+
+function startOfUtcMonth(offsetMonths = 0) {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1));
+}
+
+function utcDayKeys(dayCount) {
+  return Array.from({ length: dayCount }, (_, index) => utcDayKey(startOfUtcDay(index - (dayCount - 1))));
+}
+
+function utcMonthKeys(monthCount) {
+  return Array.from({ length: monthCount }, (_, index) => utcMonthKey(startOfUtcMonth(index - (monthCount - 1))));
+}
+
+function isoWeekKey(date) {
+  const value = new Date(date);
+  const utc = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function increment(map, key, amount = 1) {
+  if (!key) return;
+  map.set(key, (map.get(key) || 0) + amount);
+}
+
+function round2(value) {
+  return Number(Number(value || 0).toFixed(2));
+}
+
+function listingsTypeStatus(rows, keyField, keyFor) {
+  const buckets = new Map();
+  for (const row of rows) {
+    const bucket = keyFor(row.createdAt);
+    const id = `${bucket}|${row.listingType}`;
+    if (!buckets.has(id)) {
+      const base = { [keyField]: bucket, type: row.listingType };
+      for (const status of LISTING_STATUSES) base[status] = 0;
+      buckets.set(id, base);
     }
-    return obj;
+    const entry = buckets.get(id);
+    if (LISTING_STATUSES.includes(row.status)) entry[row.status] += 1;
+  }
+  return Array.from(buckets.values()).sort((left, right) => {
+    if (left[keyField] === right[keyField]) return String(left.type).localeCompare(String(right.type));
+    return left[keyField] < right[keyField] ? -1 : 1;
   });
+}
+
+async function listingsSince(start, select) {
+  return prisma.listing.findMany({
+    where: { createdAt: { gte: start } },
+    select,
+  });
+}
+
+async function isolate(label, run, fallback) {
+  try {
+    return await run();
+  } catch (error) {
+    logger.error({ err: error, report: label }, 'Admin report series failed');
+    return fallback;
+  }
 }
 
 export const reportService = {
   async listingsDaily(days = 30) {
-    const rowsCreated = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    const rowsApproved = await prisma.$queryRaw`SELECT DATE_FORMAT(approvedAt, '%Y-%m-%d') d, COUNT(*) c FROM Listing WHERE approvedAt IS NOT NULL AND approvedAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    const rowsByDate = {};
-    for (const r of rowsCreated) rowsByDate[r.d] = { date: r.d, created: Number(r.c) };
-    for (const r of rowsApproved) {
-      rowsByDate[r.d] = rowsByDate[r.d] || { date: r.d };
-      rowsByDate[r.d].approved = Number(r.c);
+    const start = startOfUtcDay(-(days - 1));
+    const rows = await prisma.listing.findMany({
+      where: { OR: [{ createdAt: { gte: start } }, { approvedAt: { gte: start } }] },
+      select: { createdAt: true, approvedAt: true },
+    });
+    const created = new Map();
+    const approved = new Map();
+    for (const row of rows) {
+      if (row.createdAt >= start) increment(created, utcDayKey(row.createdAt));
+      if (row.approvedAt && row.approvedAt >= start) increment(approved, utcDayKey(row.approvedAt));
     }
-    const baseDates = dateRangeDays(days);
-    return baseDates.map(d => ({ date: d, created: rowsByDate[d]?.created || 0, approved: rowsByDate[d]?.approved || 0 }));
+    return utcDayKeys(days).map((date) => ({
+      date,
+      created: created.get(date) || 0,
+      approved: approved.get(date) || 0,
+    }));
   },
+
   async listingsMonthly(months = 12) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m') ym, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH) GROUP BY ym ORDER BY ym`;
-    return rows.map(r => ({ month: r.ym, created: Number(r.c) }));
+    const rows = await listingsSince(startOfUtcMonth(-(months - 1)), { createdAt: true });
+    const created = new Map();
+    for (const row of rows) increment(created, utcMonthKey(row.createdAt));
+    return utcMonthKeys(months).map((month) => ({ month, created: created.get(month) || 0 }));
   },
+
   async usersDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) c FROM User WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    return fillSeries(dateRangeDays(days), rows, { registered: 'c' });
+    const start = startOfUtcDay(-(days - 1));
+    const rows = await prisma.user.findMany({
+      where: { createdAt: { gte: start } },
+      select: { createdAt: true },
+    });
+    const registered = new Map();
+    for (const row of rows) increment(registered, utcDayKey(row.createdAt));
+    return utcDayKeys(days).map((date) => ({ date, registered: registered.get(date) || 0 }));
   },
+
   async feedbackDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) feedbackCount, AVG(rating) avgRating FROM ListingFeedback WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    const base = dateRangeDays(days);
-    const map = new Map(rows.map(r => [r.d, r]));
-    return base.map(d => {
-      const r = map.get(d) || {};
-      return { date: d, feedbackCount: Number(r.feedbackCount || 0), avgRating: r.avgRating ? Number(Number(r.avgRating).toFixed(2)) : 0 };
+    const start = startOfUtcDay(-(days - 1));
+    const rows = await prisma.listingFeedback.findMany({
+      where: { createdAt: { gte: start } },
+      select: { createdAt: true, rating: true },
+    });
+    const buckets = new Map();
+    for (const row of rows) {
+      const date = utcDayKey(row.createdAt);
+      const bucket = buckets.get(date) || { count: 0, ratingTotal: 0, ratingCount: 0 };
+      bucket.count += 1;
+      if (row.rating != null) {
+        bucket.ratingTotal += row.rating;
+        bucket.ratingCount += 1;
+      }
+      buckets.set(date, bucket);
+    }
+    return utcDayKeys(days).map((date) => {
+      const bucket = buckets.get(date);
+      const avgRating = bucket?.ratingCount ? round2(bucket.ratingTotal / bucket.ratingCount) : 0;
+      return { date, feedbackCount: bucket?.count || 0, avgRating };
     });
   },
+
   async notificationsDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, COUNT(*) total, SUM(channel='EMAIL') emailCount, SUM(channel='WHATSAPP') whatsappCount, SUM(channel='SYSTEM') systemCount FROM Notification WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    const base = dateRangeDays(days);
-    const map = new Map(rows.map(r => [r.d, r]));
-    return base.map(d => {
-      const r = map.get(d) || {};
-      return { date: d, total: Number(r.total || 0), email: Number(r.emailCount || 0), whatsapp: Number(r.whatsappCount || 0), system: Number(r.systemCount || 0) };
+    const start = startOfUtcDay(-(days - 1));
+    const rows = await prisma.notification.findMany({
+      where: { createdAt: { gte: start } },
+      select: { createdAt: true, channel: true },
     });
+    const buckets = new Map();
+    for (const row of rows) {
+      const date = utcDayKey(row.createdAt);
+      const bucket = buckets.get(date) || { total: 0, email: 0, whatsapp: 0, system: 0 };
+      bucket.total += 1;
+      if (row.channel === 'EMAIL') bucket.email += 1;
+      if (row.channel === 'WHATSAPP') bucket.whatsapp += 1;
+      if (row.channel === 'SYSTEM') bucket.system += 1;
+      buckets.set(date, bucket);
+    }
+    return utcDayKeys(days).map((date) => ({ date, ...(buckets.get(date) || { total: 0, email: 0, whatsapp: 0, system: 0 }) }));
   },
+
   async approvalTimeDaily(days = 30) {
-    const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(approvedAt, '%Y-%m-%d') d, AVG(TIMESTAMPDIFF(HOUR, createdAt, approvedAt)) avgHours FROM Listing WHERE approvedAt IS NOT NULL AND approvedAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d ORDER BY d`;
-    return fillSeries(dateRangeDays(days), rows, { avgHours: 'avgHours' });
+    const start = startOfUtcDay(-(days - 1));
+    const rows = await prisma.listing.findMany({
+      where: { approvedAt: { gte: start } },
+      select: { createdAt: true, approvedAt: true },
+    });
+    const totals = new Map();
+    const counts = new Map();
+    for (const row of rows) {
+      if (!row.approvedAt) continue;
+      const date = utcDayKey(row.approvedAt);
+      const hours = (row.approvedAt.getTime() - row.createdAt.getTime()) / MS_PER_HOUR;
+      increment(totals, date, hours);
+      increment(counts, date);
+    }
+    return utcDayKeys(days).map((date) => ({
+      date,
+      avgHours: counts.get(date) ? round2(totals.get(date) / counts.get(date)) : 0,
+    }));
   },
+
   async representativesByRegion(limit = 20) {
-    const rows = await prisma.$queryRaw`SELECT region, COUNT(*) c FROM RepresentativeInfo WHERE active = 1 GROUP BY region ORDER BY c DESC LIMIT ${limit}`;
-    return rows.map(r => ({ region: r.region, count: Number(r.c) }));
+    const rows = await prisma.representativeInfo.groupBy({
+      by: ['region'],
+      where: { active: true },
+      _count: { _all: true },
+    });
+    return rows
+      .map((row) => ({ region: row.region, count: row._count._all }))
+      .sort((left, right) => right.count - left.count)
+      .slice(0, limit);
   },
+
+  async listingsTypeStatusDaily(days = 30) {
+    const rows = await listingsSince(startOfUtcDay(-(days - 1)), {
+      createdAt: true,
+      listingType: true,
+      status: true,
+    });
+    return listingsTypeStatus(rows, 'day', utcDayKey);
+  },
+
+  async listingsTypeStatusWeekly(weeks = 12) {
+    const rows = await listingsSince(startOfUtcDay(-(weeks * 7 - 1)), {
+      createdAt: true,
+      listingType: true,
+      status: true,
+    });
+    return listingsTypeStatus(rows, 'week', isoWeekKey);
+  },
+
+  async listingsTypeStatusMonthly(months = 12) {
+    const rows = await listingsSince(startOfUtcMonth(-(months - 1)), {
+      createdAt: true,
+      listingType: true,
+      status: true,
+    });
+    return listingsTypeStatus(rows, 'month', utcMonthKey);
+  },
+
+  async listingsTypeStatusYearly(years = 5) {
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear() - (years - 1), 0, 1));
+    const rows = await listingsSince(start, { createdAt: true, listingType: true, status: true });
+    return listingsTypeStatus(rows, 'year', (date) => String(new Date(date).getUTCFullYear()));
+  },
+
   async summary() {
     const [totalListings, pending, approved, totalUsers, feedbackCount, avgRatingRow] = await Promise.all([
       prisma.listing.count(),
@@ -88,27 +248,50 @@ export const reportService = {
       prisma.listing.count({ where: { status: 'APPROVED' } }),
       prisma.user.count(),
       prisma.listingFeedback.count(),
-      prisma.$queryRaw`SELECT AVG(rating) avgRating FROM ListingFeedback WHERE rating IS NOT NULL`
+      prisma.listingFeedback.aggregate({
+        where: { rating: { not: null } },
+        _avg: { rating: true },
+      }),
     ]);
-    const avgRating = Array.isArray(avgRatingRow) ? (avgRatingRow[0]?.avgRating ? Number(Number(avgRatingRow[0].avgRating).toFixed(2)) : 0) : 0;
-    return { totalListings, pendingListings: pending, approvedListings: approved, totalUsers, feedbackCount, avgRating };
+    return {
+      totalListings,
+      pendingListings: pending,
+      approvedListings: approved,
+      totalUsers,
+      feedbackCount,
+      avgRating: avgRatingRow._avg.rating ? round2(avgRatingRow._avg.rating) : 0,
+    };
   },
+
   async buildAll() {
-    const [summary, listingsDaily, listingsMonthly, usersDaily, feedbackDaily, notificationsDaily, approvalTimeDaily, repsRegion,
-      listingsTypeStatusDaily, listingsTypeStatusWeekly, listingsTypeStatusMonthly, listingsTypeStatusYearly] = await Promise.all([
-      this.summary(),
-      this.listingsDaily(),
-      this.listingsMonthly(),
-      this.usersDaily(),
-      this.feedbackDaily(),
-      this.notificationsDaily(),
-      this.approvalTimeDaily(),
-      this.representativesByRegion(),
-      this.listingsTypeStatusDaily?.() || this._listingsTypeStatusDaily(),
-      this.listingsTypeStatusWeekly?.() || this._listingsTypeStatusWeekly(),
-      this.listingsTypeStatusMonthly?.() || this._listingsTypeStatusMonthly(),
-      this.listingsTypeStatusYearly?.() || this._listingsTypeStatusYearly()
+    const [
+      summary,
+      listingsDaily,
+      listingsMonthly,
+      usersDaily,
+      feedbackDaily,
+      notificationsDaily,
+      approvalTimeDaily,
+      repsRegion,
+      listingsTypeStatusDaily,
+      listingsTypeStatusWeekly,
+      listingsTypeStatusMonthly,
+      listingsTypeStatusYearly,
+    ] = await Promise.all([
+      isolate('summary', () => this.summary(), EMPTY_SUMMARY),
+      isolate('listingsDaily', () => this.listingsDaily(), []),
+      isolate('listingsMonthly', () => this.listingsMonthly(), []),
+      isolate('usersDaily', () => this.usersDaily(), []),
+      isolate('feedbackDaily', () => this.feedbackDaily(), []),
+      isolate('notificationsDaily', () => this.notificationsDaily(), []),
+      isolate('approvalTimeDaily', () => this.approvalTimeDaily(), []),
+      isolate('representativesByRegion', () => this.representativesByRegion(), []),
+      isolate('listingsTypeStatusDaily', () => this.listingsTypeStatusDaily(), []),
+      isolate('listingsTypeStatusWeekly', () => this.listingsTypeStatusWeekly(), []),
+      isolate('listingsTypeStatusMonthly', () => this.listingsTypeStatusMonthly(), []),
+      isolate('listingsTypeStatusYearly', () => this.listingsTypeStatusYearly(), []),
     ]);
+
     return {
       summary,
       charts: {
@@ -122,60 +305,8 @@ export const reportService = {
         listingsTypeStatusDaily,
         listingsTypeStatusWeekly,
         listingsTypeStatusMonthly,
-        listingsTypeStatusYearly
-      }
+        listingsTypeStatusYearly,
+      },
     };
-  }
-};
-
-// ---- Extended listing type + status aggregations ----
-// We attach them after export to avoid cluttering the main object definition above.
-const LISTING_STATUSES = ['PENDING','APPROVED','REJECTED','SOLD','RENTED','EXPIRED','DRAFT','HIDDEN'];
-
-function pivotTypeStatusRows(rows, keyField) {
-  // rows: [{ keyField: '2025-10-02', listingType: 'RENT', status: 'PENDING', c: 5 }, ...]
-  const map = new Map();
-  for (const r of rows) {
-    const key = `${r[keyField]}|${r.listingType}`;
-    if (!map.has(key)) {
-      const base = { [keyField]: r[keyField], type: r.listingType };
-      for (const s of LISTING_STATUSES) base[s] = 0;
-      map.set(key, base);
-    }
-    const obj = map.get(key);
-    if (LISTING_STATUSES.includes(r.status)) obj[r.status] = Number(r.c);
-  }
-  return Array.from(map.values()).sort((a,b) => {
-    if (a[keyField] === b[keyField]) return a.type.localeCompare(b.type);
-    return a[keyField] < b[keyField] ? -1 : 1;
-  });
-}
-
-reportService._listingsTypeStatusDaily = async function(days = 30) {
-  const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') d, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY) GROUP BY d, listingType, status ORDER BY d`;
-  return pivotTypeStatusRows(rows.map(r => ({ ...r, day: r.d })), 'day');
-};
-
-reportService._listingsTypeStatusWeekly = async function(weeks = 12) {
-  // YEARWEEK returns e.g. 202540 for week 40 of 2025; format to YYYY-Www for readability
-  const rows = await prisma.$queryRaw`SELECT YEARWEEK(createdAt, 1) yw, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${weeks} WEEK) GROUP BY yw, listingType, status ORDER BY yw`;
-  const normalized = rows.map(r => {
-    const yw = String(r.yw); // e.g., 202540
-    const year = yw.slice(0,4);
-    const weekNum = yw.slice(4);
-    return { week: `${year}-W${weekNum}`, listingType: r.listingType, status: r.status, c: r.c };
-  });
-  return pivotTypeStatusRows(normalized, 'week');
-};
-
-reportService._listingsTypeStatusMonthly = async function(months = 12) {
-  const rows = await prisma.$queryRaw`SELECT DATE_FORMAT(createdAt, '%Y-%m') ym, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH) GROUP BY ym, listingType, status ORDER BY ym`;
-  const normalized = rows.map(r => ({ month: r.ym, listingType: r.listingType, status: r.status, c: r.c }));
-  return pivotTypeStatusRows(normalized, 'month');
-};
-
-reportService._listingsTypeStatusYearly = async function(years = 5) {
-  const rows = await prisma.$queryRaw`SELECT YEAR(createdAt) y, listingType, status, COUNT(*) c FROM Listing WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${years} YEAR) GROUP BY y, listingType, status ORDER BY y`;
-  const normalized = rows.map(r => ({ year: String(r.y), listingType: r.listingType, status: r.status, c: r.c }));
-  return pivotTypeStatusRows(normalized, 'year');
+  },
 };
