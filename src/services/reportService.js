@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { logger } from '../utils/logger.js';
 
 const LISTING_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'SOLD', 'RENTED', 'EXPIRED', 'DRAFT', 'HIDDEN'];
+const RANGES = ['daily', 'weekly', 'monthly', 'yearly'];
 const MS_PER_HOUR = 1000 * 60 * 60;
 
 const EMPTY_SUMMARY = {
@@ -13,12 +14,20 @@ const EMPTY_SUMMARY = {
   avgRating: 0,
 };
 
+function emptyPeriods() {
+  return { daily: [], weekly: [], monthly: [], yearly: [] };
+}
+
 function utcDayKey(date) {
   return new Date(date).toISOString().slice(0, 10);
 }
 
 function utcMonthKey(date) {
   return utcDayKey(date).slice(0, 7);
+}
+
+function utcYearKey(date) {
+  return String(new Date(date).getUTCFullYear());
 }
 
 function startOfUtcDay(offsetDays = 0) {
@@ -31,12 +40,16 @@ function startOfUtcMonth(offsetMonths = 0) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1));
 }
 
-function utcDayKeys(dayCount) {
-  return Array.from({ length: dayCount }, (_, index) => utcDayKey(startOfUtcDay(index - (dayCount - 1))));
+function yearlyStart() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear() - 4, 0, 1));
 }
 
-function utcMonthKeys(monthCount) {
-  return Array.from({ length: monthCount }, (_, index) => utcMonthKey(startOfUtcMonth(index - (monthCount - 1))));
+function rangeStart(range) {
+  if (range === 'daily') return startOfUtcDay(-29);
+  if (range === 'weekly') return startOfUtcDay(-(12 * 7 - 1));
+  if (range === 'monthly') return startOfUtcMonth(-11);
+  return yearlyStart();
 }
 
 function isoWeekKey(date) {
@@ -49,6 +62,37 @@ function isoWeekKey(date) {
   return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+function rangeKey(date, range) {
+  if (range === 'daily') return utcDayKey(date);
+  if (range === 'weekly') return isoWeekKey(date);
+  if (range === 'monthly') return utcMonthKey(date);
+  return utcYearKey(date);
+}
+
+function utcDayKeys(dayCount) {
+  return Array.from({ length: dayCount }, (_, index) => utcDayKey(startOfUtcDay(index - (dayCount - 1))));
+}
+
+function utcMonthKeys(monthCount) {
+  return Array.from({ length: monthCount }, (_, index) => utcMonthKey(startOfUtcMonth(index - (monthCount - 1))));
+}
+
+function weekKeys(weekCount) {
+  return Array.from({ length: weekCount }, (_, index) => isoWeekKey(startOfUtcDay(-((weekCount - 1 - index) * 7))));
+}
+
+function yearKeys(yearCount) {
+  const year = new Date().getUTCFullYear();
+  return Array.from({ length: yearCount }, (_, index) => String(year - (yearCount - 1 - index)));
+}
+
+function rangeKeys(range) {
+  if (range === 'daily') return utcDayKeys(30);
+  if (range === 'weekly') return weekKeys(12);
+  if (range === 'monthly') return utcMonthKeys(12);
+  return yearKeys(5);
+}
+
 function increment(map, key, amount = 1) {
   if (!key) return;
   map.set(key, (map.get(key) || 0) + amount);
@@ -56,6 +100,10 @@ function increment(map, key, amount = 1) {
 
 function round2(value) {
   return Number(Number(value || 0).toFixed(2));
+}
+
+function onOrAfter(date, start) {
+  return date && new Date(date) >= start;
 }
 
 function listingsTypeStatus(rows, keyField, keyFor) {
@@ -77,13 +125,6 @@ function listingsTypeStatus(rows, keyField, keyFor) {
   });
 }
 
-async function listingsSince(start, select) {
-  return prisma.listing.findMany({
-    where: { createdAt: { gte: start } },
-    select,
-  });
-}
-
 async function isolate(label, run, fallback) {
   try {
     return await run();
@@ -93,152 +134,164 @@ async function isolate(label, run, fallback) {
   }
 }
 
+function mapRanges(rows, fill) {
+  const result = {};
+  for (const range of RANGES) {
+    const start = rangeStart(range);
+    result[range] = fill(rows.filter((row) => onOrAfter(row.createdAt, start)), range);
+  }
+  return result;
+}
+
 export const reportService = {
-  async listingsDaily(days = 30) {
-    const start = startOfUtcDay(-(days - 1));
+  async listingsByRange() {
+    const start = rangeStart('yearly');
     const rows = await prisma.listing.findMany({
       where: { OR: [{ createdAt: { gte: start } }, { approvedAt: { gte: start } }] },
       select: { createdAt: true, approvedAt: true },
     });
-    const created = new Map();
-    const approved = new Map();
-    for (const row of rows) {
-      if (row.createdAt >= start) increment(created, utcDayKey(row.createdAt));
-      if (row.approvedAt && row.approvedAt >= start) increment(approved, utcDayKey(row.approvedAt));
+    const result = {};
+    for (const range of RANGES) {
+      const windowStart = rangeStart(range);
+      const created = new Map();
+      const approved = new Map();
+      for (const row of rows) {
+        if (onOrAfter(row.createdAt, windowStart)) increment(created, rangeKey(row.createdAt, range));
+        if (onOrAfter(row.approvedAt, windowStart)) increment(approved, rangeKey(row.approvedAt, range));
+      }
+      result[range] = rangeKeys(range).map((period) => ({
+        period,
+        created: created.get(period) || 0,
+        approved: approved.get(period) || 0,
+      }));
     }
-    return utcDayKeys(days).map((date) => ({
-      date,
-      created: created.get(date) || 0,
-      approved: approved.get(date) || 0,
-    }));
+    return result;
   },
 
-  async listingsMonthly(months = 12) {
-    const rows = await listingsSince(startOfUtcMonth(-(months - 1)), { createdAt: true });
-    const created = new Map();
-    for (const row of rows) increment(created, utcMonthKey(row.createdAt));
-    return utcMonthKeys(months).map((month) => ({ month, created: created.get(month) || 0 }));
-  },
-
-  async usersDaily(days = 30) {
-    const start = startOfUtcDay(-(days - 1));
+  async usersByRange() {
     const rows = await prisma.user.findMany({
-      where: { createdAt: { gte: start } },
+      where: { createdAt: { gte: rangeStart('yearly') } },
       select: { createdAt: true },
     });
-    const registered = new Map();
-    for (const row of rows) increment(registered, utcDayKey(row.createdAt));
-    return utcDayKeys(days).map((date) => ({ date, registered: registered.get(date) || 0 }));
+    return mapRanges(rows, (windowRows, range) => {
+      const registered = new Map();
+      for (const row of windowRows) increment(registered, rangeKey(row.createdAt, range));
+      return rangeKeys(range).map((period) => ({ period, registered: registered.get(period) || 0 }));
+    });
   },
 
-  async feedbackDaily(days = 30) {
-    const start = startOfUtcDay(-(days - 1));
+  async feedbackByRange() {
     const rows = await prisma.listingFeedback.findMany({
-      where: { createdAt: { gte: start } },
+      where: { createdAt: { gte: rangeStart('yearly') } },
       select: { createdAt: true, rating: true },
     });
-    const buckets = new Map();
-    for (const row of rows) {
-      const date = utcDayKey(row.createdAt);
-      const bucket = buckets.get(date) || { count: 0, ratingTotal: 0, ratingCount: 0 };
-      bucket.count += 1;
-      if (row.rating != null) {
-        bucket.ratingTotal += row.rating;
-        bucket.ratingCount += 1;
+    return mapRanges(rows, (windowRows, range) => {
+      const buckets = new Map();
+      for (const row of windowRows) {
+        const period = rangeKey(row.createdAt, range);
+        const bucket = buckets.get(period) || { count: 0, ratingTotal: 0, ratingCount: 0 };
+        bucket.count += 1;
+        if (row.rating != null) {
+          bucket.ratingTotal += row.rating;
+          bucket.ratingCount += 1;
+        }
+        buckets.set(period, bucket);
       }
-      buckets.set(date, bucket);
-    }
-    return utcDayKeys(days).map((date) => {
-      const bucket = buckets.get(date);
-      const avgRating = bucket?.ratingCount ? round2(bucket.ratingTotal / bucket.ratingCount) : 0;
-      return { date, feedbackCount: bucket?.count || 0, avgRating };
+      return rangeKeys(range).map((period) => {
+        const bucket = buckets.get(period);
+        const avgRating = bucket?.ratingCount ? round2(bucket.ratingTotal / bucket.ratingCount) : 0;
+        return { period, feedbackCount: bucket?.count || 0, avgRating };
+      });
     });
   },
 
-  async notificationsDaily(days = 30) {
-    const start = startOfUtcDay(-(days - 1));
+  async notificationsByRange() {
     const rows = await prisma.notification.findMany({
-      where: { createdAt: { gte: start } },
+      where: { createdAt: { gte: rangeStart('yearly') } },
       select: { createdAt: true, channel: true },
     });
-    const buckets = new Map();
-    for (const row of rows) {
-      const date = utcDayKey(row.createdAt);
-      const bucket = buckets.get(date) || { total: 0, email: 0, whatsapp: 0, system: 0 };
-      bucket.total += 1;
-      if (row.channel === 'EMAIL') bucket.email += 1;
-      if (row.channel === 'WHATSAPP') bucket.whatsapp += 1;
-      if (row.channel === 'SYSTEM') bucket.system += 1;
-      buckets.set(date, bucket);
-    }
-    return utcDayKeys(days).map((date) => ({ date, ...(buckets.get(date) || { total: 0, email: 0, whatsapp: 0, system: 0 }) }));
+    return mapRanges(rows, (windowRows, range) => {
+      const buckets = new Map();
+      for (const row of windowRows) {
+        const period = rangeKey(row.createdAt, range);
+        const bucket = buckets.get(period) || { total: 0, email: 0, whatsapp: 0, system: 0 };
+        bucket.total += 1;
+        if (row.channel === 'EMAIL') bucket.email += 1;
+        if (row.channel === 'WHATSAPP') bucket.whatsapp += 1;
+        if (row.channel === 'SYSTEM') bucket.system += 1;
+        buckets.set(period, bucket);
+      }
+      return rangeKeys(range).map((period) => ({
+        period,
+        ...(buckets.get(period) || { total: 0, email: 0, whatsapp: 0, system: 0 }),
+      }));
+    });
   },
 
-  async approvalTimeDaily(days = 30) {
-    const start = startOfUtcDay(-(days - 1));
+  async approvalTimeByRange() {
     const rows = await prisma.listing.findMany({
-      where: { approvedAt: { gte: start } },
+      where: { approvedAt: { gte: rangeStart('yearly') } },
       select: { createdAt: true, approvedAt: true },
     });
-    const totals = new Map();
-    const counts = new Map();
-    for (const row of rows) {
-      if (!row.approvedAt) continue;
-      const date = utcDayKey(row.approvedAt);
-      const hours = (row.approvedAt.getTime() - row.createdAt.getTime()) / MS_PER_HOUR;
-      increment(totals, date, hours);
-      increment(counts, date);
+    const result = {};
+    for (const range of RANGES) {
+      const windowStart = rangeStart(range);
+      const totals = new Map();
+      const counts = new Map();
+      for (const row of rows) {
+        if (!onOrAfter(row.approvedAt, windowStart)) continue;
+        const period = rangeKey(row.approvedAt, range);
+        const hours = (new Date(row.approvedAt).getTime() - new Date(row.createdAt).getTime()) / MS_PER_HOUR;
+        increment(totals, period, hours);
+        increment(counts, period);
+      }
+      result[range] = rangeKeys(range).map((period) => ({
+        period,
+        avgHours: counts.get(period) ? round2(totals.get(period) / counts.get(period)) : 0,
+      }));
     }
-    return utcDayKeys(days).map((date) => ({
-      date,
-      avgHours: counts.get(date) ? round2(totals.get(date) / counts.get(date)) : 0,
-    }));
+    return result;
   },
 
-  async representativesByRegion(limit = 20) {
-    const rows = await prisma.representativeInfo.groupBy({
-      by: ['region'],
-      where: { active: true },
-      _count: { _all: true },
+  async representativesByRange(limit = 20) {
+    const rows = await prisma.representativeInfo.findMany({
+      where: { active: true, user: { createdAt: { gte: rangeStart('yearly') } } },
+      select: { region: true, user: { select: { createdAt: true } } },
     });
-    return rows
-      .map((row) => ({ region: row.region, count: row._count._all }))
-      .sort((left, right) => right.count - left.count)
-      .slice(0, limit);
+    const result = {};
+    for (const range of RANGES) {
+      const windowStart = rangeStart(range);
+      const counts = new Map();
+      for (const row of rows) {
+        if (!onOrAfter(row.user?.createdAt, windowStart)) continue;
+        increment(counts, row.region || 'Unknown');
+      }
+      result[range] = [...counts.entries()]
+        .map(([region, count]) => ({ region, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, limit);
+    }
+    return result;
   },
 
-  async listingsTypeStatusDaily(days = 30) {
-    const rows = await listingsSince(startOfUtcDay(-(days - 1)), {
-      createdAt: true,
-      listingType: true,
-      status: true,
+  async listingsTypeStatusByRange() {
+    const rows = await prisma.listing.findMany({
+      where: { createdAt: { gte: rangeStart('yearly') } },
+      select: { createdAt: true, listingType: true, status: true },
     });
-    return listingsTypeStatus(rows, 'day', utcDayKey);
-  },
-
-  async listingsTypeStatusWeekly(weeks = 12) {
-    const rows = await listingsSince(startOfUtcDay(-(weeks * 7 - 1)), {
-      createdAt: true,
-      listingType: true,
-      status: true,
-    });
-    return listingsTypeStatus(rows, 'week', isoWeekKey);
-  },
-
-  async listingsTypeStatusMonthly(months = 12) {
-    const rows = await listingsSince(startOfUtcMonth(-(months - 1)), {
-      createdAt: true,
-      listingType: true,
-      status: true,
-    });
-    return listingsTypeStatus(rows, 'month', utcMonthKey);
-  },
-
-  async listingsTypeStatusYearly(years = 5) {
-    const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear() - (years - 1), 0, 1));
-    const rows = await listingsSince(start, { createdAt: true, listingType: true, status: true });
-    return listingsTypeStatus(rows, 'year', (date) => String(new Date(date).getUTCFullYear()));
+    const keyFor = {
+      daily: utcDayKey,
+      weekly: isoWeekKey,
+      monthly: utcMonthKey,
+      yearly: utcYearKey,
+    };
+    const keyField = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' };
+    const result = {};
+    for (const range of RANGES) {
+      const windowRows = rows.filter((row) => onOrAfter(row.createdAt, rangeStart(range)));
+      result[range] = listingsTypeStatus(windowRows, keyField[range], keyFor[range]);
+    }
+    return result;
   },
 
   async summary() {
@@ -266,46 +319,67 @@ export const reportService = {
   async buildAll() {
     const [
       summary,
-      listingsDaily,
-      listingsMonthly,
-      usersDaily,
-      feedbackDaily,
-      notificationsDaily,
-      approvalTimeDaily,
-      repsRegion,
-      listingsTypeStatusDaily,
-      listingsTypeStatusWeekly,
-      listingsTypeStatusMonthly,
-      listingsTypeStatusYearly,
+      listings,
+      users,
+      feedback,
+      notifications,
+      approvalTime,
+      representativesByRegion,
+      listingsTypeStatus,
     ] = await Promise.all([
       isolate('summary', () => this.summary(), EMPTY_SUMMARY),
-      isolate('listingsDaily', () => this.listingsDaily(), []),
-      isolate('listingsMonthly', () => this.listingsMonthly(), []),
-      isolate('usersDaily', () => this.usersDaily(), []),
-      isolate('feedbackDaily', () => this.feedbackDaily(), []),
-      isolate('notificationsDaily', () => this.notificationsDaily(), []),
-      isolate('approvalTimeDaily', () => this.approvalTimeDaily(), []),
-      isolate('representativesByRegion', () => this.representativesByRegion(), []),
-      isolate('listingsTypeStatusDaily', () => this.listingsTypeStatusDaily(), []),
-      isolate('listingsTypeStatusWeekly', () => this.listingsTypeStatusWeekly(), []),
-      isolate('listingsTypeStatusMonthly', () => this.listingsTypeStatusMonthly(), []),
-      isolate('listingsTypeStatusYearly', () => this.listingsTypeStatusYearly(), []),
+      isolate('listings', () => this.listingsByRange(), emptyPeriods()),
+      isolate('users', () => this.usersByRange(), emptyPeriods()),
+      isolate('feedback', () => this.feedbackByRange(), emptyPeriods()),
+      isolate('notifications', () => this.notificationsByRange(), emptyPeriods()),
+      isolate('approvalTime', () => this.approvalTimeByRange(), emptyPeriods()),
+      isolate('representativesByRegion', () => this.representativesByRange(), emptyPeriods()),
+      isolate('listingsTypeStatus', () => this.listingsTypeStatusByRange(), emptyPeriods()),
     ]);
 
     return {
       summary,
       charts: {
-        listingsDaily,
-        listingsMonthly,
-        usersDaily,
-        feedbackDaily,
-        notificationsDaily,
-        approvalTimeDaily,
-        representativesByRegion: repsRegion,
-        listingsTypeStatusDaily,
-        listingsTypeStatusWeekly,
-        listingsTypeStatusMonthly,
-        listingsTypeStatusYearly,
+        listings,
+        users,
+        feedback,
+        notifications,
+        approvalTime,
+        representativesByRegion,
+        listingsTypeStatus,
+        listingsDaily: (listings.daily || []).map((point) => ({
+          date: point.period,
+          created: point.created,
+          approved: point.approved,
+        })),
+        listingsMonthly: (listings.monthly || []).map((point) => ({
+          month: point.period,
+          created: point.created,
+        })),
+        usersDaily: (users.daily || []).map((point) => ({
+          date: point.period,
+          registered: point.registered,
+        })),
+        feedbackDaily: (feedback.daily || []).map((point) => ({
+          date: point.period,
+          feedbackCount: point.feedbackCount,
+          avgRating: point.avgRating,
+        })),
+        notificationsDaily: (notifications.daily || []).map((point) => ({
+          date: point.period,
+          total: point.total,
+          email: point.email,
+          whatsapp: point.whatsapp,
+          system: point.system,
+        })),
+        approvalTimeDaily: (approvalTime.daily || []).map((point) => ({
+          date: point.period,
+          avgHours: point.avgHours,
+        })),
+        listingsTypeStatusDaily: listingsTypeStatus.daily || [],
+        listingsTypeStatusWeekly: listingsTypeStatus.weekly || [],
+        listingsTypeStatusMonthly: listingsTypeStatus.monthly || [],
+        listingsTypeStatusYearly: listingsTypeStatus.yearly || [],
       },
     };
   },
