@@ -61,3 +61,7 @@ coverage/
 /path/to/ignore-me.txt
 .vercel
 .env*
+# Committed templates only. Real .env files stay ignored.
+!.env.example
+!.env.*.example
+!examples/**/*.example
