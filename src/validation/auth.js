@@ -11,8 +11,10 @@ export const loginSchema = Joi.object({
   recaptchaToken: Joi.string().allow('', null).optional(),
 });
 export const googleSocialLoginSchema = Joi.object({
-  idToken: Joi.string().required(),
-});
+  idToken: Joi.string().optional(),
+  code: Joi.string().optional(),
+  redirectUri: Joi.string().uri().optional(),
+}).or('idToken', 'code');
 
 export const facebookSocialLoginSchema = Joi.object({
   accessToken: Joi.string().required(),

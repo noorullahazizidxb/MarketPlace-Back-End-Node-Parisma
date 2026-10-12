@@ -9,6 +9,41 @@ import { config } from '../config/index.js';
 import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 import { publicFileUrl } from '../lib/upload.js';
 
+const GOOGLE_CALLBACK_PATH = '/api/auth/callback/google';
+
+function isAllowedGoogleRedirect(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.pathname !== GOOGLE_CALLBACK_PATH) return false;
+  const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  if (local) return url.protocol === 'http:' || url.protocol === 'https:';
+  return url.protocol === 'https:' && url.hostname === 'marketplace.devminds.net';
+}
+
+async function exchangeGoogleAuthorizationCode(code, redirectUri) {
+  const body = new URLSearchParams({
+    code,
+    client_id: config.socialAuth.googleClientId,
+    client_secret: config.socialAuth.googleClientSecret,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+  });
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+    cache: 'no-store',
+  }).then(async (response) => {
+    const json = await response.json().catch(() => null);
+    return response.ok ? json : null;
+  });
+  return tokenResponse?.id_token || null;
+}
+
 async function requireRecaptcha(req, action) {
   await verifyRecaptchaToken(req.body?.recaptchaToken, {
     secret: config.recaptcha.secretKey,
@@ -171,8 +206,18 @@ export const authController = {
     if (!config.socialAuth.googleClientId) return res.apiError('Google auth is not configured', 503);
 
     try {
+      let idToken = value.idToken;
+      if (!idToken) {
+        if (!config.socialAuth.googleClientSecret) return res.apiError('Google auth is not configured', 503);
+        if (!value.redirectUri || !isAllowedGoogleRedirect(value.redirectUri)) {
+          return res.apiError('Invalid Google redirect', 400);
+        }
+        idToken = await exchangeGoogleAuthorizationCode(value.code, value.redirectUri);
+      }
+      if (!idToken) return res.apiError('Invalid Google token', 401);
+
       const verifyUrl = new URL('https://oauth2.googleapis.com/tokeninfo');
-      verifyUrl.searchParams.set('id_token', value.idToken);
+      verifyUrl.searchParams.set('id_token', idToken);
       const tokenInfo = await fetch(verifyUrl, { cache: 'no-store' }).then(async (response) => {
         const json = await response.json().catch(() => null);
         return response.ok ? json : null;
