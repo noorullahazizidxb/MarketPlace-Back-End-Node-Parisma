@@ -333,6 +333,13 @@ All routes are prefixed with `/api`.
 |--------|------|------|-------------|
 | GET | `/stats` | ✓ Admin | Dashboard statistics (totals, queue stats, charts) |
 
+### UI context — `/api/ui-context`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | – | Read the public theme, layout, and component variant settings |
+| PATCH | `/` | ✓ Admin | Persist the UI context in Vercel Blob (local development uses `.data/ui-context.json`) |
+
 ### Other Routes
 
 | Base | Description |

@@ -63,7 +63,7 @@ In Vercel → **Settings → Environment Variables**, paste [`.env.vercel.exampl
 - `TOKEN_SECRET` / `JWT_SECRET`
 - `CORS_ORIGIN=https://marketplace.devminds.net`
 - `CRON_SECRET` (Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`)
-- `BLOB_READ_WRITE_TOKEN` optional for persistent uploads
+- `BLOB_READ_WRITE_TOKEN` required for durable UI-context settings and persistent uploads
 
 Build: `npm run build` (generates the Postgres client from `prisma/postgres/schema.prisma` when `DB_PROVIDER=postgresql`). Entry: `api/index.js`. Daily cleanup: cron `GET /api/maintenance/cleanup-expired`.
 

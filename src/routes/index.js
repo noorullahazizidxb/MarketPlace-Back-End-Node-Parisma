@@ -16,12 +16,14 @@ import storiesRouter from './stories.js';
 import blogsRouter from './blogs.js';
 import contactsRouter from './contacts.js';
 import publicRouter from './public.js';
+import uiContextRouter from './uiContext.js';
 import { runtimeSummary } from '../lib/runtime.js';
 
 export function registerRoutes(app) {
   const api = express.Router();
   api.get('/health', (req, res) => res.apiSuccess({ ok: true, runtime: runtimeSummary() }, 'OK', 200));
   api.use('/public', (req, res, next) => { res.locals.entityName = 'Public'; next(); }, publicRouter);
+  api.use('/ui-context', (req, res, next) => { res.locals.entityName = 'UiContext'; next(); }, uiContextRouter);
 
   // Listings (create/get/approve...)
   api.use('/listings', (req, res, next) => { res.locals.entityName = 'Listing'; next(); }, listingsRouter);
