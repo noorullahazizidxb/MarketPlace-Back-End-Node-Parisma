@@ -8,7 +8,7 @@ const BLOB_PATH = 'marketplace/ui-context.json';
 async function readBlobState() {
   const { get } = await import('@vercel/blob');
   const blob = await get(BLOB_PATH, {
-    access: 'private',
+    access: 'public',
     token: process.env.BLOB_READ_WRITE_TOKEN,
   });
   if (!blob) return null;
@@ -44,7 +44,7 @@ export async function writeUiContextState(state) {
   if (blobEnabled) {
     const { put } = await import('@vercel/blob');
     await put(BLOB_PATH, serialized, {
-      access: 'private',
+      access: 'public',
       token: process.env.BLOB_READ_WRITE_TOKEN,
       addRandomSuffix: false,
       allowOverwrite: true,
