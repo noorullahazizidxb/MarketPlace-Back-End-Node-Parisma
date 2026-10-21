@@ -34,7 +34,18 @@ export const config = {
     allowSelfSigned: parseBoolean(process.env.ELASTICSEARCH_ALLOW_SELF_SIGNED, true)
   },
   tokens: {
-    secret: process.env.TOKEN_SECRET || process.env.JWT_SECRET || 'dev_secret'
+    secret: process.env.TOKEN_SECRET || process.env.JWT_SECRET || 'dev_secret',
+    // Access-token lifetimes (seconds). Admins get a short-lived token refreshed via rotating refresh tokens.
+    adminAccessTtlSeconds: parseInt(process.env.ADMIN_ACCESS_TOKEN_TTL_SECONDS || String(60 * 60), 10),
+    userAccessTtlSeconds: parseInt(process.env.USER_ACCESS_TOKEN_TTL_SECONDS || String(24 * 60 * 60), 10),
+    // Refresh-token lifetimes (seconds).
+    adminRefreshTtlSeconds: parseInt(process.env.ADMIN_REFRESH_TOKEN_TTL_SECONDS || String(12 * 60 * 60), 10),
+    userRefreshTtlSeconds: parseInt(process.env.USER_REFRESH_TOKEN_TTL_SECONDS || String(30 * 24 * 60 * 60), 10),
+    issuer: process.env.TOKEN_ISSUER || 'devminds-marketplace'
+  },
+  loginRateLimit: {
+    windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || String(15 * 60 * 1000), 10),
+    max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10)
   },
   socialAuth: {
     googleClientId: process.env.GOOGLE_CLIENT_ID,

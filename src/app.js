@@ -5,7 +5,7 @@ import bodyParser from 'body-parser';
 import { logger } from './utils/logger.js';
 import { registerRoutes } from './routes/index.js';
 import { attachAuth } from './middleware/auth.js';
-import { responseWrapper } from './middleware/responseWrapper.js';
+import { responseWrapper, errorHandler } from './middleware/responseWrapper.js';
 import { apiRateLimiter } from './middleware/rateLimit.js';
 import { corsOrigins, isVercel, runtimeSummary } from './lib/runtime.js';
 import { uploadsRoot } from './lib/upload.js';
@@ -47,10 +47,6 @@ app.get('/health', async (_req, res) => {
 registerRoutes(app);
 app.use('/api/maintenance', maintenanceRouter);
 
-app.use((err, req, res, next) => {
-  logger.error(err, 'Unhandled error');
-  if (res.apiError) return res.apiError(err.message || 'Internal error', err.status || 500);
-  res.status(err.status || 500).json({ error: err.message || 'Internal error' });
-});
+app.use(errorHandler);
 
 export default app;

@@ -1,23 +1,27 @@
-// Simple role-based auth placeholder (replace with JWT logic)
 import { Roles } from '../constants/enums.js';
 import { jwtAuth } from './jwtAuth.js';
 
-// attach jwtAuth first
 export const attachAuth = jwtAuth;
 
 export function requireAuth(req, res, next) {
-  if (!req.user) return res.apiError('Unauthorized', 401);
+  if (!req.user) {
+    if (req.authError === 'expired') {
+      res.set('WWW-Authenticate', 'Bearer error="invalid_token", error_description="token expired"');
+      return res.apiError('Your session has expired, please sign in again', 401, { code: 'TOKEN_EXPIRED' });
+    }
+    return res.apiError('Authentication required', 401, { code: 'UNAUTHENTICATED' });
+  }
   next();
 }
 
 export function requireRole(role) {
   return (req, res, next) => {
-    if (!req.user || !req.user.roles?.includes(role)) {
-      return res.apiError('Forbidden', 403);
+    if (!req.user) return requireAuth(req, res, next);
+    if (!req.user.roles?.includes(role)) {
+      return res.apiError('You do not have permission to perform this action', 403, { code: 'FORBIDDEN' });
     }
     next();
   };
 }
 
-// Convenience middleware specifically for admin-only routes
 export const requireAdmin = requireRole(Roles.ADMIN);

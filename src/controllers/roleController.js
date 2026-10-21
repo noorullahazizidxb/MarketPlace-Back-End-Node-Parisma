@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
-import { assignRoleSchema } from '../validation/userRole.js';
+import { assignRoleSchema, changeRoleSchema } from '../validation/userRole.js';
+import { roleService } from '../services/roleServiceInstance.js';
 import { Roles } from '../constants/enums.js';
 
 export const roleController = {
@@ -59,4 +60,16 @@ roleController.remove = async function (req, res) {
     await prisma.userRole.delete({ where: { id } });
     res.apiSuccess(null, 'Deleted', 200);
   } catch (e) { res.apiError('Failed', 500); }
+};
+
+// PATCH /users/:id/role  { role } — replace a user's role (ADMIN only, guarded against removing the last admin)
+roleController.changeUserRole = async function (req, res, next) {
+  const { error, value } = changeRoleSchema.validate(req.body || {});
+  if (error) return res.apiError(error.message, 400);
+  try {
+    const user = await roleService.changeUserRole({ userId: req.params.id, role: value.role });
+    return res.apiSuccess(user, `User role changed to ${value.role}`, 200);
+  } catch (err) {
+    return next(err);
+  }
 };

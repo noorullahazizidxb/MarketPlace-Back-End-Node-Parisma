@@ -1,6 +1,6 @@
 import { userRepository } from '../repositories/userRepository.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
-import jwt from 'jsonwebtoken';
+import { tokenService } from './tokenServiceInstance.js';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
 import crypto from 'node:crypto';
@@ -140,9 +140,8 @@ export const userService = {
 
     return this.getFullUser(user.id);
   },
+  // Kept for backward compatibility; prefer tokenService.issueSession (access + refresh tokens).
   generateToken(user) {
-    const roles = (user.roles || []).map(r => r.role);
-    const payload = { sub: user.id, roles };
-    return jwt.sign(payload, config.tokens.secret, { expiresIn: '7d' });
+    return tokenService.signAccessToken(user).token;
   }
 };
