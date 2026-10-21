@@ -200,7 +200,9 @@ export const authController = {
       );
       return res.apiSuccess({ ...session, user: slimUser(user) }, 'Session refreshed successfully', 200);
     } catch (err) {
-      return res.apiError(err?.message || 'Invalid refresh token', err?.statusCode || 401);
+      // Only expose messages from our own typed errors (never raw DB/driver errors).
+      if (err?.statusCode) return res.apiError(err.message, err.statusCode);
+      return res.apiError('Your session has expired, please sign in again', 401);
     }
   },
 
