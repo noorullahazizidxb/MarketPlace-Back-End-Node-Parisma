@@ -18,33 +18,34 @@ import contactsRouter from './contacts.js';
 import publicRouter from './public.js';
 import uiContextRouter from './uiContext.js';
 import { runtimeSummary } from '../lib/runtime.js';
+import { forEntity } from '../middleware/responseWrapper.js';
 
 export function registerRoutes(app) {
   const api = express.Router();
-  api.get('/health', (req, res) => res.apiSuccess({ ok: true, runtime: runtimeSummary() }, 'OK', 200));
-  api.use('/public', (req, res, next) => { res.locals.entityName = 'Public'; next(); }, publicRouter);
-  api.use('/ui-context', (req, res, next) => { res.locals.entityName = 'UiContext'; next(); }, uiContextRouter);
+  api.get('/health', (req, res) => res.apiSuccess({ ok: true, runtime: runtimeSummary() }, 'Service is healthy', 200));
+  api.use('/public', forEntity('Public'), publicRouter);
+  api.use('/ui-context', forEntity('UiContext'), uiContextRouter);
 
   // Listings (create/get/approve...)
-  api.use('/listings', (req, res, next) => { res.locals.entityName = 'Listing'; next(); }, listingsRouter);
-  api.use('/categories', (req, res, next) => { res.locals.entityName = 'Category'; next(); }, categoriesRouter);
-  api.use('/representatives', (req, res, next) => { res.locals.entityName = 'RepresentativeInfo'; next(); }, representativesRouter);
-  api.use('/auth', (req, res, next) => { res.locals.entityName = 'Auth'; next(); }, authRouter);
-  api.use('/notifications', (req, res, next) => { res.locals.entityName = 'Notification'; next(); }, notificationsRouter);
+  api.use('/listings', forEntity('Listing'), listingsRouter);
+  api.use('/categories', forEntity('Category'), categoriesRouter);
+  api.use('/representatives', forEntity('RepresentativeInfo'), representativesRouter);
+  api.use('/auth', forEntity('Auth'), authRouter);
+  api.use('/notifications', forEntity('Notification'), notificationsRouter);
   // also support singular `/notification` for clients hitting that path
-  api.use('/notification', (req, res, next) => { res.locals.entityName = 'Notification'; next(); }, notificationsRouter);
-  api.use('/search', (req, res, next) => { res.locals.entityName = 'Search'; next(); }, searchRouter);
+  api.use('/notification', forEntity('Notification'), notificationsRouter);
+  api.use('/search', forEntity('Search'), searchRouter);
   // forwarding feature removed - no longer registering /forward routes
-  api.use('/renew', (req, res, next) => { res.locals.entityName = 'Renew'; next(); }, renewRouter);
-  api.use('/roles', (req, res, next) => { res.locals.entityName = 'Role'; next(); }, rolesRouter);
-  api.use('/admin', (req, res, next) => { res.locals.entityName = 'Admin'; next(); }, adminRouter);
-  api.use('/listings', (req, res, next) => { res.locals.entityName = 'ListingImages'; next(); }, listingImagesRouter);
-  api.use('/users', (req, res, next) => { res.locals.entityName = 'User'; next(); }, userRouter);
-  api.use('/feedbacks', (req, res, next) => { res.locals.entityName = 'ListingFeedback'; next(); }, listingFeedbacksRouter);
-  api.use('/ads', (req, res, next) => { res.locals.entityName = 'Ad'; next(); }, adsRouter);
-  api.use('/stories', (req, res, next) => { res.locals.entityName = 'Story'; next(); }, storiesRouter);
-  api.use('/blogs', (req, res, next) => { res.locals.entityName = 'Blog'; next(); }, blogsRouter);
-  api.use('/contacts', (req, res, next) => { res.locals.entityName = 'Contact'; next(); }, contactsRouter);
+  api.use('/renew', forEntity('Renew'), renewRouter);
+  api.use('/roles', forEntity('Role'), rolesRouter);
+  api.use('/admin', forEntity('Admin'), adminRouter);
+  api.use('/listings', forEntity('ListingImages'), listingImagesRouter);
+  api.use('/users', forEntity('User'), userRouter);
+  api.use('/feedbacks', forEntity('ListingFeedback'), listingFeedbacksRouter);
+  api.use('/ads', forEntity('Ad'), adsRouter);
+  api.use('/stories', forEntity('Story'), storiesRouter);
+  api.use('/blogs', forEntity('Blog'), blogsRouter);
+  api.use('/contacts', forEntity('Contact'), contactsRouter);
 
   app.use('/api', api);
 }

@@ -1,3 +1,4 @@
+import { refreshTokenRepository } from '../repositories/refreshTokenRepository.js';
 import { Router } from 'express';
 import { config } from '../config/index.js';
 import { prisma } from '../config/prisma.js';
@@ -57,7 +58,14 @@ async function runInlineCleanup() {
     logger.warn({ err: e?.message }, 'Blog cleanup failed');
   }
 
-  return { unapproved, stories, blogs, runtime: runtimeSummary() };
+  let refreshTokens = 0;
+  try {
+    refreshTokens = (await refreshTokenRepository.deleteExpired()).count;
+  } catch (e) {
+    logger.warn({ err: e?.message }, 'Refresh token cleanup failed');
+  }
+
+  return { unapproved, stories, blogs, refreshTokens, runtime: runtimeSummary() };
 }
 
 async function cleanupExpired(req, res) {

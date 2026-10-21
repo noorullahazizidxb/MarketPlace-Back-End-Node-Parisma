@@ -1,5 +1,6 @@
 import Joi from 'joi';
-import { createUserSchema } from './user.js';
+import { createUserSchema, representativeInfoItem } from './user.js';
+import { Roles } from '../constants/enums.js';
 
 export const registerSchema = createUserSchema.keys({
   password: Joi.string().min(6).required(),
@@ -18,4 +19,19 @@ export const googleSocialLoginSchema = Joi.object({
 
 export const facebookSocialLoginSchema = Joi.object({
   accessToken: Joi.string().required(),
+});
+
+// Admin-created accounts: any role, no reCAPTCHA (route is ADMIN-only).
+export const adminCreateUserSchema = registerSchema.keys({
+  role: Joi.string().valid(...Object.values(Roles)).default(Roles.USER),
+  confirmPassword: Joi.any().valid(Joi.ref('password')).optional().messages({ 'any.only': 'confirmPassword must match password' }),
+  representativeInfo: Joi.alternatives().try(representativeInfoItem, Joi.array().items(representativeInfoItem)).optional(),
+});
+
+export const refreshTokenSchema = Joi.object({
+  refreshToken: Joi.string().min(20).max(200).required(),
+});
+
+export const logoutSchema = Joi.object({
+  refreshToken: Joi.string().max(200).allow('', null).optional(),
 });

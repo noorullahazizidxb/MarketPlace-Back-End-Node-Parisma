@@ -126,6 +126,7 @@ model User {
   stories           Story[]
   blogs             Blog[]
   blogComments      BlogComment[]
+  refreshTokens     RefreshToken[]
 
   @@index([phone])
 }
@@ -433,4 +434,22 @@ model Contact {
   subject   ContactSubject
   phone     String?
   message   String         @db.Text
+}
+
+// Rotating refresh tokens (only a SHA-256 hash of the opaque token is stored).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  familyId     String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+  userAgent    String?
+  ip           String?
+
+  @@index([userId])
+  @@index([familyId])
 }

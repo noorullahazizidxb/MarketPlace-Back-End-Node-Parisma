@@ -6,3 +6,7 @@ export const assignRoleSchema = Joi.object({
   role: Joi.string().valid(...Object.values(Roles)).required(),
   metadata: Joi.object().optional()
 });
+
+export const changeRoleSchema = Joi.object({
+  role: Joi.string().valid(...Object.values(Roles)).required(),
+});

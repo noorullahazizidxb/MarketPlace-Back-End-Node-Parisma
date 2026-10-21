@@ -2,7 +2,9 @@ import { userService } from '../services/userService.js';
 import { storage } from '../utils/storage.js';
 import { Roles } from '../constants/enums.js';
 import { createNotification } from '../notifications/dispatcher.js';
-import { registerSchema, loginSchema, googleSocialLoginSchema, facebookSocialLoginSchema } from '../validation/auth.js';
+import { registerSchema, loginSchema, googleSocialLoginSchema, facebookSocialLoginSchema, adminCreateUserSchema, refreshTokenSchema, logoutSchema } from '../validation/auth.js';
+import { tokenService } from '../services/tokenServiceInstance.js';
+import { prisma } from '../config/prisma.js';
 import { registerRepresentativeSchema } from '../validation/user.js';
 import { representativeService } from '../services/representativeService.js';
 import { config } from '../config/index.js';
@@ -53,134 +55,122 @@ async function requireRecaptcha(req, action) {
   });
 }
 
+const JSON_FIELDS = ['contacts', 'address', 'metadata', 'representativeInfo'];
+
+/** Normalise a (possibly multipart) registration request into a plain payload. */
+async function buildRegistrationPayload(req) {
+  const payload = { ...req.body };
+  if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
+  if (req.file) {
+    try {
+      const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
+      payload.photo = publicFileUrl(req.file, dest);
+    } catch {
+      payload.photo = `/${req.file.path}`;
+    }
+  }
+  JSON_FIELDS.forEach((k) => {
+    if (typeof payload[k] === 'string') {
+      try { payload[k] = JSON.parse(payload[k]); } catch { /* leave as string */ }
+    }
+  });
+  return payload;
+}
+
+/** Persist representative regions; never blocks account creation. */
+async function persistRepresentativeInfo(userId, repInfo) {
+  if (!repInfo) return;
+  const list = Array.isArray(repInfo) ? repInfo : [repInfo];
+  for (const item of list) {
+    if (!item?.region) continue;
+    try {
+      await representativeService.create({ region: item.region, whatsappNumber: item.whatsappNumber, active: item.active }, userId);
+    } catch { /* ignore */ }
+  }
+}
+
+const requestContext = (req) => ({ userAgent: req.headers['user-agent'], ip: req.ip });
+
+/** Issue access + refresh tokens and send the standard auth envelope. */
+async function respondWithSession(req, res, user, { message, statusCode = 200, fullUser } = {}) {
+  const session = await tokenService.issueSession(user, requestContext(req));
+  const full = fullUser || (await userService.getFullUser(user.id));
+  return res.apiSuccess({ ...session, user: full }, message, statusCode);
+}
+
+function handleRegistrationError(res, err) {
+  if (err && err.code === 'P2002') return res.apiError('A user with this email already exists', 409);
+  return res.apiError(err?.message || 'Failed to create user', err?.statusCode || 500);
+}
+
+function slimUser(user) {
+  if (!user) return null;
+  return { id: user.id, email: user.email, fullName: user.fullName, photo: user.photo, roles: user.roles };
+}
+
 export const authController = {
   // NOTE: generic /auth/register removed - use role-specific endpoints
 
-  // explicitly register as USER (same as /register)
   async registerUser(req, res) {
     try {
       await requireRecaptcha(req, 'register');
     } catch (e) {
       return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
     }
-    // if multipart was used, multer may place the file in req.file or req.files (upload.any())
-    const payload = { ...req.body };
-    if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
-    if (req.file) {
-      // try to move temp upload to permanent location
-      try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = publicFileUrl(req.file, dest);
-      } catch (e) {
-        // fallback: store temp path reference
-        payload.photo = `/${req.file.path}`;
-      }
-    }
-    // parse JSON fields if they were sent as strings (multipart)
-    ['contacts', 'address', 'metadata', 'representativeInfo'].forEach(k => {
-      if (typeof payload[k] === 'string') {
-        try { payload[k] = JSON.parse(payload[k]); } catch (e) { /* leave as string */ }
-      }
-    });
+    const payload = await buildRegistrationPayload(req);
     const { error, value } = registerSchema.validate(payload);
     if (error) return res.apiError(error.message, 400);
     try {
-      // if payload did not include role, default to USER
-      const roleToUse = payload.role !== undefined && payload.role !== null ? payload.role : Roles.USER;
-      const user = await userService.register(value, roleToUse);
-      const token = userService.generateToken(user);
-      const full = await userService.getFullUser(user.id);
-      // send welcome notification (fire-and-forget)
+      // Public self-registration always creates a USER; a client-supplied role is ignored (privilege escalation).
+      const user = await userService.register(value, Roles.USER);
       try {
         await createNotification({
           title: 'Welcome to the Marketplace',
-          message: `Welcome ${full.fullName || full.email || 'user'} — your account has been created successfully.`,
+          message: `Welcome ${user.fullName || user.email || 'user'} — your account has been created successfully.`,
           channel: 'SYSTEM',
           targetType: 'USER',
           senderId: null,
-          recipientUserIds: [full.id]
+          recipientUserIds: [user.id]
         });
-      } catch (e) {
-        // don't block registration on notification failures
-      }
-      return res.apiSuccess({ user: full, token }, 'Created', 201);
+      } catch { /* don't block registration on notification failures */ }
+      return respondWithSession(req, res, user, { message: 'Account created successfully', statusCode: 201 });
     } catch (err) {
-      // Prisma unique constraint error
-      if (err && err.code === 'P2002') return res.apiError('Email already exists', 409);
-      return res.apiError(err?.message || 'Server error', 500);
+      return handleRegistrationError(res, err);
     }
   },
 
-  // register as representative (public endpoint)
   async registerRepresentative(req, res) {
     try {
       await requireRecaptcha(req, 'register');
     } catch (e) {
       return res.apiError(e.message || 'reCAPTCHA failed', e.status || 400);
     }
-    const payload = { ...req.body };
-    if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
-    if (req.file) {
-      try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = publicFileUrl(req.file, dest);
-      } catch (e) {
-        payload.photo = `/${req.file.path}`;
-      }
-    }
-    ['contacts', 'address', 'metadata', 'representativeInfo'].forEach(k => { if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) { } } });
-    // use representative-specific validation when registering a representative
+    const payload = await buildRegistrationPayload(req);
     const { error, value } = registerRepresentativeSchema.validate(payload);
     if (error) return res.apiError(error.message, 400);
     try {
       const user = await userService.register(value, Roles.REPRESENTATIVE);
-      // if representativeInfo was provided (object or array), persist all entries (supports multiple regions)
-      try {
-        const repInfo = value.representativeInfo;
-        if (repInfo) {
-          const list = Array.isArray(repInfo) ? repInfo : [repInfo];
-          for (const item of list) {
-            if (item && item.region) {
-              // create representative info linked to this user; don't block registration on failure
-              await representativeService.create({ region: item.region, whatsappNumber: item.whatsappNumber, active: item.active }, user.id);
-            }
-          }
-        }
-      } catch (e) {
-        // ignore representative creation errors for now
-      }
-      const token = userService.generateToken(user);
-      const full = await userService.getFullUser(user.id);
-      return res.apiSuccess({ user: full, token }, 'Created', 201);
+      await persistRepresentativeInfo(user.id, value.representativeInfo);
+      return respondWithSession(req, res, user, { message: 'Representative account created successfully', statusCode: 201 });
     } catch (err) {
-      if (err && err.code === 'P2002') return res.apiError('Email already exists', 409);
-      return res.apiError(err?.message || 'Server error', 500);
+      return handleRegistrationError(res, err);
     }
   },
 
-  // register admin - protected endpoint (only ADMIN can create another ADMIN)
+  // Admin-only: create an account with any role. No session is issued for the new account.
   async registerAdmin(req, res) {
-    const payload = { ...req.body };
-    if (!req.file && Array.isArray(req.files) && req.files.length > 0) req.file = req.files[0];
-    if (req.file) {
-      try {
-        const dest = await storage.saveTempTo('uploads/users', req.file.path, req.file.originalname || 'photo');
-        payload.photo = publicFileUrl(req.file, dest);
-      } catch (e) {
-        payload.photo = `/${req.file.path}`;
-      }
-    }
-    ['contacts', 'address', 'metadata', 'representativeInfo'].forEach(k => { if (typeof payload[k] === 'string') { try { payload[k] = JSON.parse(payload[k]); } catch (e) { } } });
-    const { error, value } = registerSchema.validate(payload);
+    const payload = await buildRegistrationPayload(req);
+    if (payload.role === undefined || payload.role === '') payload.role = Roles.ADMIN; // backward compatible default
+    const { error, value } = adminCreateUserSchema.validate(payload);
     if (error) return res.apiError(error.message, 400);
     try {
-      const user = await userService.register(value, Roles.ADMIN);
-      const token = userService.generateToken(user);
+      const { role, representativeInfo, confirmPassword: _c, recaptchaToken: _r, ...data } = value;
+      const user = await userService.register(data, role);
+      if (role === Roles.REPRESENTATIVE) await persistRepresentativeInfo(user.id, representativeInfo);
       const full = await userService.getFullUser(user.id);
-      return res.apiSuccess({ user: full, token }, 'Created', 201);
+      return res.apiSuccess({ user: full }, 'User created successfully', 201);
     } catch (err) {
-      if (err && err.code === 'P2002') return res.apiError('Email already exists', 409);
-      return res.apiError(err?.message || 'Server error', 500);
+      return handleRegistrationError(res, err);
     }
   },
 
@@ -194,12 +184,36 @@ export const authController = {
     if (error) return res.apiError(error.message, 400);
     const { recaptchaToken: _token, ...credentials } = value;
     const user = await userService.login(credentials);
-    if (!user) return res.apiError('Invalid credentials', 401);
-    const token = userService.generateToken(user);
-    const full = await userService.getFullUser(user.id);
-    res.apiSuccess({ token, user: full }, 'OK', 200);
-  }
-  ,
+    if (!user) return res.apiError('Invalid email or password', 401);
+    return respondWithSession(req, res, user, { message: 'Signed in successfully', fullUser: user });
+  },
+
+  // Exchange a refresh token for a new access token + rotated refresh token.
+  async refresh(req, res) {
+    const { error, value } = refreshTokenSchema.validate(req.body || {});
+    if (error) return res.apiError('Refresh token is required', 400);
+    try {
+      const { user, session } = await tokenService.rotate(
+        value.refreshToken,
+        (id) => prisma.user.findUnique({ where: { id }, include: { roles: true } }),
+        requestContext(req),
+      );
+      return res.apiSuccess({ ...session, user: slimUser(user) }, 'Session refreshed successfully', 200);
+    } catch (err) {
+      return res.apiError(err?.message || 'Invalid refresh token', err?.statusCode || 401);
+    }
+  },
+
+  // Revoke the refresh-token family. Always succeeds so clients can finish signing out.
+  async logout(req, res) {
+    const { value } = logoutSchema.validate(req.body || {});
+    try {
+      if (value?.refreshToken) await tokenService.revoke(value.refreshToken);
+      if (req.query?.all === 'true' && req.user?.id) await tokenService.revokeAllForUser(req.user.id);
+    } catch { /* best effort */ }
+    return res.apiSuccess(null, 'Signed out successfully', 200);
+  },
+
   async googleSocialLogin(req, res) {
     const { error, value } = googleSocialLoginSchema.validate(req.body);
     if (error) return res.apiError(error.message, 400);
@@ -239,8 +253,7 @@ export const authController = {
 
       if (!user) return res.apiError('Unable to authenticate Google user', 401);
 
-      const token = userService.generateToken(user);
-      return res.apiSuccess({ token, user }, 'OK', 200);
+      return respondWithSession(req, res, user, { message: 'Signed in successfully', fullUser: user });
     } catch (err) {
       return res.apiError(err?.message || 'Google sign-in failed', 500);
     }
@@ -290,8 +303,7 @@ export const authController = {
 
       if (!user) return res.apiError('Unable to authenticate Facebook user', 401);
 
-      const token = userService.generateToken(user);
-      return res.apiSuccess({ token, user }, 'OK', 200);
+      return respondWithSession(req, res, user, { message: 'Signed in successfully', fullUser: user });
     } catch (err) {
       return res.apiError(err?.message || 'Facebook sign-in failed', 500);
     }
@@ -301,7 +313,7 @@ export const authController = {
       const userId = req.user?.id;
       if (!userId) return res.apiError('Unauthorized', 401);
       const full = await userService.getFullUser(userId);
-      return res.apiSuccess(full, 'OK', 200);
+      return res.apiSuccess(full, 'Profile retrieved successfully', 200);
     } catch (e) {
       return res.apiError('Failed to load profile', 500);
     }
