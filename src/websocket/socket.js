@@ -60,6 +60,12 @@ export function initWebsockets(server) {
   return io;
 }
 
+/** Disconnect all sockets and close the Socket.IO server (and its HTTP server). */
+export function closeWebsockets() {
+  if (!io) return Promise.resolve();
+  return new Promise((resolve) => io.close(() => resolve()));
+}
+
 export function getIO() {
   return io || noopIo;
 }

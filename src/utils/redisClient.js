@@ -15,3 +15,10 @@ export function getRedis() {
   }
   return client;
 }
+
+export async function closeRedis() {
+  if (!client) return;
+  const current = client;
+  client = undefined;
+  await current.quit();
+}

@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js';
 export async function registerWorkers() {
   if (!queueEnabled) {
     logger.info('BullMQ workers skipped (queues disabled)');
-    return;
+    return [];
   }
   const loaders = [
     import('./moderationWorker.js'),
@@ -17,6 +17,7 @@ export async function registerWorkers() {
     import('./blogExpiryWorker.js'),
   ];
   if (searchEnabled) loaders.push(import('./searchWorker.js'));
-  await Promise.all(loaders);
+  const modules = await Promise.all(loaders);
   logger.info('BullMQ workers registered');
+  return modules.flatMap((mod) => Object.values(mod).filter((w) => typeof w?.close === 'function'));
 }
