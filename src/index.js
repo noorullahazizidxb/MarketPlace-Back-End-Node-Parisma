@@ -3,10 +3,13 @@ import http from 'http';
 import app from './app.js';
 import { logger } from './utils/logger.js';
 import { config } from './config/index.js';
-import { initQueues } from './jobs/queues.js';
+import { prisma } from './config/prisma.js';
+import { closeQueues, initQueues } from './jobs/queues.js';
+import { registerGracefulShutdown } from './lib/shutdown.js';
+import { closeRedis } from './utils/redisClient.js';
 import { initBlogsIndex, initSearch, initUsersIndex } from './search/elasticsearch.js';
 import { scheduleRecurringJobs } from './schedulers/cron.js';
-import { initWebsockets } from './websocket/socket.js';
+import { closeWebsockets, initWebsockets } from './websocket/socket.js';
 import { registerWorkers } from './workers/register.js';
 import {
   isVercelRuntime,
@@ -47,7 +50,7 @@ if (!isVercelRuntime) {
       logger.warn(e, 'Failed to schedule recurring jobs');
     }
 
-    await registerWorkers();
+    const workers = await registerWorkers();
 
     const server = http.createServer(app);
     if (socketEnabled) {
@@ -63,6 +66,20 @@ if (!isVercelRuntime) {
     server.listen(config.port, () => {
       logger.info(`API listening on :${config.port}`);
       logger.info({ runtime: runtimeSummary() }, 'runtime');
+    });
+
+    registerGracefulShutdown({
+      // Socket.IO's close() disconnects clients and closes the HTTP server; server.close() then
+      // covers the case where websockets failed to initialise (ERR_SERVER_NOT_RUNNING is tolerated).
+      server: socketEnabled ? { close: (cb) => closeWebsockets().then(() => server.close(cb)) } : server,
+      cleanups: [
+        () => Promise.all(workers.map((w) => w.close())),
+        closeQueues,
+        closeRedis,
+        () => prisma.$disconnect(),
+      ],
+      timeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10_000,
+      logger,
     });
   }
 

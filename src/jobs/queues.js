@@ -57,3 +57,11 @@ export async function initQueues() {
   }
   logger.info('Queues initialized');
 }
+
+export async function closeQueues() {
+  await Promise.all(Object.values(queues).map((q) => q.close?.()));
+  if (connections.primary) {
+    await connections.primary.quit();
+    delete connections.primary;
+  }
+}
